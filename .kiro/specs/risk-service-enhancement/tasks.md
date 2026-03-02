@@ -187,7 +187,7 @@
     - 创建 `config/domain_service/risk/time_decay_monitor.toml`，包含到期提醒天数配置
     - _Requirements: 全部_
 
-  - [~] 9.2 在 `domain_service_config_loader.py` 中新增配置加载函数
+  - [x] 9.2 在 `domain_service_config_loader.py` 中新增配置加载函数
     - 新增 `load_stop_loss_config`、`load_risk_budget_config`、`load_liquidity_monitor_config`、`load_concentration_config`、`load_time_decay_config` 五个函数
     - 遵循 overrides > TOML > dataclass 默认值优先级
     - TOML 文件不存在时使用 dataclass 默认值

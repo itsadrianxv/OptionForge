@@ -21,6 +21,13 @@ from src.strategy.domain.value_object.trading.order_execution import (
     OrderExecutionConfig,
     AdvancedSchedulerConfig,
 )
+from src.strategy.domain.value_object.risk.risk import (
+    StopLossConfig,
+    RiskBudgetConfig,
+    LiquidityMonitorConfig,
+    ConcentrationConfig,
+    TimeDecayConfig,
+)
 
 
 # 项目根目录 (从 src/main/config/ 向上 3 级)
@@ -285,3 +292,164 @@ def _map_field(
         kwargs[config_key] = overrides[override_key]
     elif toml_key in toml_section:
         kwargs[config_key] = toml_section[toml_key]
+
+
+def load_stop_loss_config(
+    overrides: Optional[dict] = None,
+) -> StopLossConfig:
+    """
+    加载止损管理配置
+
+    优先级: overrides > TOML 文件 > dataclass 默认值
+
+    Args:
+        overrides: 运行时覆盖值
+    """
+    data = _load_toml(_DOMAIN_SERVICE_CONFIG_DIR / "risk" / "stop_loss_manager.toml")
+    overrides = overrides or {}
+
+    fixed_stop = data.get("fixed_stop", {})
+    trailing_stop = data.get("trailing_stop", {})
+    portfolio_stop = data.get("portfolio_stop", {})
+
+    kwargs = {}
+
+    # fixed_stop
+    _map_field(kwargs, "enable_fixed_stop", overrides, "enable_fixed_stop", fixed_stop, "enable")
+    _map_field(kwargs, "fixed_stop_loss_amount", overrides, "fixed_stop_loss_amount", fixed_stop, "loss_amount")
+    _map_field(kwargs, "fixed_stop_loss_percent", overrides, "fixed_stop_loss_percent", fixed_stop, "loss_percent")
+
+    # trailing_stop
+    _map_field(kwargs, "enable_trailing_stop", overrides, "enable_trailing_stop", trailing_stop, "enable")
+    _map_field(kwargs, "trailing_stop_percent", overrides, "trailing_stop_percent", trailing_stop, "stop_percent")
+
+    # portfolio_stop
+    _map_field(kwargs, "enable_portfolio_stop", overrides, "enable_portfolio_stop", portfolio_stop, "enable")
+    _map_field(kwargs, "daily_loss_limit", overrides, "daily_loss_limit", portfolio_stop, "daily_loss_limit")
+
+    return StopLossConfig(**kwargs)
+
+
+def load_risk_budget_config(
+    overrides: Optional[dict] = None,
+) -> RiskBudgetConfig:
+    """
+    加载风险预算分配配置
+
+    优先级: overrides > TOML 文件 > dataclass 默认值
+
+    Args:
+        overrides: 运行时覆盖值
+    """
+    data = _load_toml(_DOMAIN_SERVICE_CONFIG_DIR / "risk" / "risk_budget_allocator.toml")
+    overrides = overrides or {}
+
+    allocation = data.get("allocation", {})
+    ratios = allocation.get("ratios", {})
+
+    kwargs = {}
+
+    # allocation
+    _map_field(kwargs, "allocation_dimension", overrides, "allocation_dimension", allocation, "dimension")
+    _map_field(kwargs, "allow_dynamic_adjustment", overrides, "allow_dynamic_adjustment", allocation, "allow_dynamic_adjustment")
+
+    # allocation_ratios
+    if "allocation_ratios" in overrides:
+        kwargs["allocation_ratios"] = overrides["allocation_ratios"]
+    elif ratios:
+        kwargs["allocation_ratios"] = ratios
+
+    return RiskBudgetConfig(**kwargs)
+
+
+def load_liquidity_monitor_config(
+    overrides: Optional[dict] = None,
+) -> LiquidityMonitorConfig:
+    """
+    加载持仓流动性监控配置
+
+    优先级: overrides > TOML 文件 > dataclass 默认值
+
+    Args:
+        overrides: 运行时覆盖值
+    """
+    data = _load_toml(_DOMAIN_SERVICE_CONFIG_DIR / "risk" / "liquidity_risk_monitor.toml")
+    overrides = overrides or {}
+
+    weights = data.get("weights", {})
+    thresholds = data.get("thresholds", {})
+    historical = data.get("historical", {})
+
+    kwargs = {}
+
+    # weights
+    _map_field(kwargs, "volume_weight", overrides, "volume_weight", weights, "volume_weight")
+    _map_field(kwargs, "spread_weight", overrides, "spread_weight", weights, "spread_weight")
+    _map_field(kwargs, "open_interest_weight", overrides, "open_interest_weight", weights, "open_interest_weight")
+
+    # thresholds
+    _map_field(kwargs, "liquidity_score_threshold", overrides, "liquidity_score_threshold", thresholds, "liquidity_score_threshold")
+
+    # historical
+    _map_field(kwargs, "lookback_days", overrides, "lookback_days", historical, "lookback_days")
+
+    return LiquidityMonitorConfig(**kwargs)
+
+
+def load_concentration_config(
+    overrides: Optional[dict] = None,
+) -> ConcentrationConfig:
+    """
+    加载集中度风险监控配置
+
+    优先级: overrides > TOML 文件 > dataclass 默认值
+
+    Args:
+        overrides: 运行时覆盖值
+    """
+    data = _load_toml(_DOMAIN_SERVICE_CONFIG_DIR / "risk" / "concentration_monitor.toml")
+    overrides = overrides or {}
+
+    concentration_limits = data.get("concentration_limits", {})
+    hhi = data.get("hhi", {})
+    calculation = data.get("calculation", {})
+
+    kwargs = {}
+
+    # concentration_limits
+    _map_field(kwargs, "underlying_concentration_limit", overrides, "underlying_concentration_limit", concentration_limits, "underlying_limit")
+    _map_field(kwargs, "expiry_concentration_limit", overrides, "expiry_concentration_limit", concentration_limits, "expiry_limit")
+    _map_field(kwargs, "strike_concentration_limit", overrides, "strike_concentration_limit", concentration_limits, "strike_limit")
+
+    # hhi
+    _map_field(kwargs, "hhi_threshold", overrides, "hhi_threshold", hhi, "threshold")
+
+    # calculation
+    _map_field(kwargs, "concentration_basis", overrides, "concentration_basis", calculation, "basis")
+
+    return ConcentrationConfig(**kwargs)
+
+
+def load_time_decay_config(
+    overrides: Optional[dict] = None,
+) -> TimeDecayConfig:
+    """
+    加载时间衰减监控配置
+
+    优先级: overrides > TOML 文件 > dataclass 默认值
+
+    Args:
+        overrides: 运行时覆盖值
+    """
+    data = _load_toml(_DOMAIN_SERVICE_CONFIG_DIR / "risk" / "time_decay_monitor.toml")
+    overrides = overrides or {}
+
+    expiry_warning = data.get("expiry_warning", {})
+
+    kwargs = {}
+
+    # expiry_warning
+    _map_field(kwargs, "expiry_warning_days", overrides, "expiry_warning_days", expiry_warning, "warning_days")
+    _map_field(kwargs, "critical_expiry_days", overrides, "critical_expiry_days", expiry_warning, "critical_days")
+
+    return TimeDecayConfig(**kwargs)
