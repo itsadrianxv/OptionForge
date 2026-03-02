@@ -119,7 +119,7 @@
     - **Property 12: 持仓过滤正确性**
     - **Validates: Requirements 3.8**
 
-- [~] 6. 实现 ConcentrationMonitor（集中度风险监控服务）
+- [x] 6. 实现 ConcentrationMonitor（集中度风险监控服务）
   - [x] 6.1 创建 `src/strategy/domain/domain_service/risk/concentration_monitor.py`
     - 实现 `__init__` 接受 `ConcentrationConfig` 参数
     - 实现 `calculate_concentration` 方法：计算品种、到期日、行权价三个维度的集中度和 HHI
@@ -149,7 +149,7 @@
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.6**
 
 - [~] 7. 实现 TimeDecayMonitor（时间衰减监控服务）
-  - [~] 7.1 创建 `src/strategy/domain/domain_service/risk/time_decay_monitor.py`
+  - [x] 7.1 创建 `src/strategy/domain/domain_service/risk/time_decay_monitor.py`
     - 实现 `__init__` 接受 `TimeDecayConfig` 参数
     - 实现 `calculate_portfolio_theta` 方法：计算组合总 Theta 和每日预期衰减金额
     - 实现 `identify_expiring_positions` 方法：识别临近到期的持仓
