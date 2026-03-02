@@ -41,7 +41,7 @@
     - 正确处理 datetime 对象的序列化和反序列化
     - _需求: 2.1, 2.2, 2.3, 2.4_
 
-  - [-] 2.2 编写 AdvancedOrderSchedulerSerializer 单元测试
+  - [x] 2.2 编写 AdvancedOrderSchedulerSerializer 单元测试
     - 创建 `tests/strategy/infrastructure/persistence/test_advanced_order_scheduler_serializer.py`
     - 测试基本序列化和反序列化
     - 测试包含复杂订单结构的序列化
@@ -49,7 +49,7 @@
     - 测试错误处理
     - _需求: 7.1, 7.5_
 
-  - [ ] 2.3 编写 AdvancedOrderSchedulerSerializer 属性测试
+  - [-] 2.3 编写 AdvancedOrderSchedulerSerializer 属性测试
     - 创建 `tests/strategy/infrastructure/persistence/test_advanced_order_scheduler_serializer_properties.py`
     - **属性 2: AdvancedOrderScheduler 序列化往返保持等价性**
     - **验证需求: 2.5**
