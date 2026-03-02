@@ -2,10 +2,14 @@
 TimeDecayMonitor - 时间衰减监控服务
 
 负责监控组合的时间衰减风险，识别临近到期的持仓，计算 Theta 指标。
+
+职责变更说明:
+- 合约解析职责已移至 ContractHelper (基础设施层)
+- 日期计算职责已移至 DateCalculator (基础设施层)
+- 本服务专注于纯业务逻辑：Theta 计算、到期识别、风险提醒
 """
 
 import logging
-import re
 from datetime import datetime
 from typing import Dict, List
 
@@ -17,6 +21,8 @@ from ...value_object.risk.risk import (
     ExpiringPosition,
     ExpiryGroup,
 )
+from src.strategy.infrastructure.parsing.contract_helper import ContractHelper
+from src.strategy.infrastructure.utils.date_calculator import DateCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +36,10 @@ class TimeDecayMonitor:
     2. 识别临近到期的持仓
     3. 按到期日分组统计持仓分布
     4. 生成到期提醒
+    
+    注意:
+    - 合约解析使用 ContractHelper (infrastructure/parsing)
+    - 日期计算使用 DateCalculator (infrastructure/utils)
     """
     
     def __init__(self, config: TimeDecayConfig) -> None:
@@ -110,12 +120,12 @@ class TimeDecayMonitor:
                 continue
             
             # 提取到期日
-            expiry_date_str = self._extract_expiry_from_symbol(pos.vt_symbol)
+            expiry_date_str = ContractHelper.extract_expiry_from_symbol(pos.vt_symbol)
             if expiry_date_str == "unknown":
                 continue
             
             # 计算距离到期天数
-            days_to_expiry = self._calculate_days_to_expiry(
+            days_to_expiry = DateCalculator.calculate_days_to_expiry(
                 expiry_date_str, current_date
             )
             
@@ -160,7 +170,7 @@ class TimeDecayMonitor:
                 continue
             
             # 提取到期日
-            expiry_date_str = self._extract_expiry_from_symbol(pos.vt_symbol)
+            expiry_date_str = ContractHelper.extract_expiry_from_symbol(pos.vt_symbol)
             
             # 如果该到期日还没有分组，创建新分组
             if expiry_date_str not in expiry_groups:
@@ -232,31 +242,3 @@ class TimeDecayMonitor:
         else:
             return None
     
-    def _extract_expiry_from_symbol(self, vt_symbol: str) -> str:
-        """
-        从合约代码中提取到期日
-        
-        期权合约格式示例: "IO2401-C-4000.CFFEX", "m2509-C-2800.DCE"
-        提取年月部分作为到期日标识
-        
-        Args:
-            vt_symbol: 合约代码
-            
-        Returns:
-            到期日字符串（如 "2401", "2509"）
-        """
-        try:
-            # 移除交易所后缀
-            symbol = vt_symbol.split('.')[0]
-            
-            # 期权格式: 字母+年月+期权类型+行权价
-            # 提取年月部分（通常是前面的数字部分）
-            match = re.search(r'(\d{4})', symbol)
-            if match:
-                return match.group(1)
-            
-            logger.warning(f"Cannot extract expiry from {vt_symbol}")
-            return "unknown"
-        except Exception as e:
-            logger.warning(f"Error extracting expiry from {vt_symbol}: {e}")
-            return "unknown"

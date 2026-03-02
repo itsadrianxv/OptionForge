@@ -179,7 +179,7 @@
     - _需求: 3.4, 5.3, 8.4_
 
 - [ ] 10. 重构 TimeDecayMonitor 领域服务
-  - [ ] 10.1 使用 ContractHelper 和 DateCalculator 替代内部方法
+  - [x] 10.1 使用 ContractHelper 和 DateCalculator 替代内部方法
     - 修改 `src/strategy/domain/domain_service/risk/time_decay_monitor.py`
     - 导入 ContractHelper 和 DateCalculator
     - 将 `_extract_expiry_from_symbol` 调用替换为 `ContractHelper.extract_expiry_from_symbol`
