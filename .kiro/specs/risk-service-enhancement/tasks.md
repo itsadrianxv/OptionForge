@@ -157,7 +157,7 @@
     - 实现内部辅助方法 `_calculate_days_to_expiry`、`_determine_urgency`
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-  - [~] 7.2 编写 TimeDecayMonitor 单元测试
+  - [x] 7.2 编写 TimeDecayMonitor 单元测试
     - 创建 `tests/strategy/domain/domain_service/risk/test_time_decay_monitor.py`
     - 测试组合 Theta 计算
     - 测试临近到期持仓识别
