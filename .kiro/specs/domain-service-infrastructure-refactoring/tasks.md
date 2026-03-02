@@ -15,7 +15,7 @@
     - 处理缺失字段，使用默认值
     - _需求: 1.1, 1.2, 1.3, 1.4_
 
-  - [-] 1.2 编写 SmartOrderExecutorSerializer 单元测试
+  - [x] 1.2 编写 SmartOrderExecutorSerializer 单元测试
     - 创建 `tests/strategy/infrastructure/persistence/test_smart_order_executor_serializer.py`
     - 测试基本序列化和反序列化
     - 测试包含订单的序列化
@@ -23,7 +23,7 @@
     - 测试错误处理（None 输入、无效数据）
     - _需求: 7.1, 7.5_
 
-  - [ ] 1.3 编写 SmartOrderExecutorSerializer 属性测试
+  - [-] 1.3 编写 SmartOrderExecutorSerializer 属性测试
     - 创建 `tests/strategy/infrastructure/persistence/test_smart_order_executor_serializer_properties.py`
     - **属性 1: SmartOrderExecutor 序列化往返保持等价性**
     - **验证需求: 1.5**
