@@ -92,7 +92,7 @@
     - _需求: 3.2, 3.3, 3.6_
 
 - [ ] 4. 创建 DateCalculator 日期计算工具
-  - [ ] 4.1 实现 DateCalculator 类
+  - [x] 4.1 实现 DateCalculator 类
     - 创建 `src/strategy/infrastructure/utils/date_calculator.py`
     - 实现 `parse_expiry_date` 静态方法，解析 YYMM 格式到期日
     - 假设到期日为该月 15 日（简化实现）
@@ -100,7 +100,7 @@
     - 处理异常情况，返回 None
     - _需求: 4.1, 4.2, 4.3, 4.4_
 
-  - [ ] 4.2 编写 DateCalculator 单元测试
+  - [x] 4.2 编写 DateCalculator 单元测试
     - 创建 `tests/strategy/infrastructure/utils/test_date_calculator.py`
     - 测试有效 YYMM 格式的解析
     - 测试天数计算的准确性
