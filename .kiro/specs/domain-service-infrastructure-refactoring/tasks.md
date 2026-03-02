@@ -108,7 +108,7 @@
     - 测试异常情况（无效格式、无效月份）
     - _需求: 7.1, 7.5_
 
-  - [ ] 4.3 编写 DateCalculator 属性测试
+  - [x] 4.3 编写 DateCalculator 属性测试
     - 创建 `tests/strategy/infrastructure/utils/test_date_calculator_properties.py`
     - **属性 6: 日期计算正确性**
     - **验证需求: 4.2, 4.5**
