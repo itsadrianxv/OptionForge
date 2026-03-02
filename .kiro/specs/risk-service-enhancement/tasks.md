@@ -92,7 +92,7 @@
 - [x] 4. 检查点 - 止损和预算服务验证
   - 确保所有测试通过，如有问题请向用户确认。
 
-- [~] 5. 实现 LiquidityRiskMonitor（持仓流动性监控服务）
+- [x] 5. 实现 LiquidityRiskMonitor（持仓流动性监控服务）
   - [x] 5.1 创建 `src/strategy/domain/domain_service/risk/liquidity_risk_monitor.py`
     - 实现 `__init__` 接受 `LiquidityMonitorConfig` 参数
     - 实现 `calculate_liquidity_score` 方法：计算流动性评分（成交量、价差、持仓量三个维度）
@@ -120,7 +120,7 @@
     - **Validates: Requirements 3.8**
 
 - [~] 6. 实现 ConcentrationMonitor（集中度风险监控服务）
-  - [~] 6.1 创建 `src/strategy/domain/domain_service/risk/concentration_monitor.py`
+  - [x] 6.1 创建 `src/strategy/domain/domain_service/risk/concentration_monitor.py`
     - 实现 `__init__` 接受 `ConcentrationConfig` 参数
     - 实现 `calculate_concentration` 方法：计算品种、到期日、行权价三个维度的集中度和 HHI
     - 实现 `check_concentration_limits` 方法：检查集中度是否超限并生成警告
