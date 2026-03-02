@@ -166,7 +166,7 @@
     - 测试边界情况：空持仓、所有持仓同一到期日、已到期持仓
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-  - [~] 7.3 编写 TimeDecayMonitor 属性测试
+  - [x] 7.3 编写 TimeDecayMonitor 属性测试
     - 创建 `tests/strategy/domain/domain_service/risk/test_time_decay_properties.py`
     - **Property 17: Theta 聚合正确性**
     - **Validates: Requirements 5.1, 5.4, 5.7**
