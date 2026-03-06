@@ -1,0 +1,329 @@
+"""Lifecycle orchestration workflow for StrategyEntry."""
+
+from __future__ import annotations
+
+from pathlib import Path
+import os
+from typing import TYPE_CHECKING
+
+from vnpy.trader.constant import Interval
+from vnpy_portfoliostrategy import StrategyTemplate
+
+from ..domain.aggregate.combination_aggregate import CombinationAggregate
+from ..domain.aggregate.position_aggregate import PositionAggregate
+from ..domain.aggregate.target_instrument_aggregate import InstrumentManager
+from ..domain.domain_service.pricing import GreeksCalculator
+from ..domain.domain_service.risk.portfolio_risk_aggregator import PortfolioRiskAggregator
+from ..domain.domain_service.risk.position_sizing_service import PositionSizingService
+from ..domain.domain_service.selection.future_selection_service import FutureSelectionService
+from ..domain.domain_service.selection.option_selector_service import OptionSelectorService
+from ..domain.domain_service.signal.indicator_service import IndicatorService
+from ..domain.domain_service.signal.signal_service import SignalService
+from ..domain.domain_service.execution.smart_order_executor import SmartOrderExecutor
+from ..domain.event.event_types import EVENT_STRATEGY_ALERT
+from ..domain.value_object.order_execution import OrderExecutionConfig
+from ..domain.value_object.risk import RiskThresholds
+from ..infrastructure.bar_pipeline import BarPipeline
+from ..infrastructure.gateway.vnpy_account_gateway import VnpyAccountGateway
+from ..infrastructure.gateway.vnpy_market_data_gateway import VnpyMarketDataGateway
+from ..infrastructure.gateway.vnpy_trade_execution_gateway import VnpyTradeExecutionGateway
+from ..infrastructure.monitoring.strategy_monitor import StrategyMonitor
+from ..infrastructure.persistence.auto_save_service import AutoSaveService
+from ..infrastructure.persistence.exceptions import CorruptionError
+from ..infrastructure.persistence.json_serializer import JsonSerializer
+from ..infrastructure.persistence.state_repository import ArchiveNotFound, StateRepository
+from ..infrastructure.reporting.feishu_handler import FeishuEventHandler
+from src.main.bootstrap.database_factory import DatabaseFactory
+
+if TYPE_CHECKING:
+    from src.strategy.strategy_entry import StrategyEntry
+
+
+class LifecycleWorkflow:
+    """Coordinate StrategyEntry lifecycle callbacks."""
+
+    def __init__(self, entry: "StrategyEntry") -> None:
+        self.entry = entry
+
+    def on_init(self) -> None:
+        """Initialize services, gateways, warmup, and alert handlers."""
+        self.entry.logger.info("策略初始化...")
+
+        # ______________________________  1. 加载交易品种配置  ______________________________
+
+        from src.main.config.config_loader import ConfigLoader
+        self.entry.target_products = ConfigLoader.load_target_products()
+        if not self.entry.target_products:
+            self.entry.logger.error("未配置任何交易品种，请先检查并配置 trading_target.toml")
+            raise RuntimeError("策略初始化失败：未配置交易品种")
+        self.entry.logger.info(f"已加载配置的标的: {len(self.entry.target_products)} 个品种")
+
+        # ______________________________  2. 创建领域服务  ______________________________
+
+        project_root = Path(__file__).resolve().parents[3]
+
+        # ── 加载 strategy_config.toml ──
+        try:
+            strategy_config_path = str(project_root / "config" / "strategy_config.toml")
+            full_config = ConfigLoader.load_toml(strategy_config_path)
+        except Exception:
+            full_config = {}
+
+        try:
+            subscription_config_path = project_root / "config" / "subscription" / "subscription.toml"
+            if subscription_config_path.exists():
+                self.entry.subscription_config = ConfigLoader.load_toml(str(subscription_config_path))
+            else:
+                self.entry.subscription_config = {"enabled": False}
+        except Exception as e:
+            self.entry.logger.warning(f"加载订阅配置失败，将禁用订阅模式引擎: {e}")
+            self.entry.subscription_config = {"enabled": False}
+        self.entry._init_subscription_management()
+
+        self.entry.indicator_service = IndicatorService()
+        self.entry.signal_service = SignalService()
+
+        # ── 从 TOML 配置 + YAML 覆盖加载领域服务配置 ──
+        from src.main.config.domain_service_config_loader import (
+            load_position_sizing_config,
+            load_future_selector_config,
+            load_option_selector_config,
+        )
+
+        ps_cfg = full_config.get("position_sizing", {})
+        ps_overrides = {**ps_cfg, "max_positions": self.entry.max_positions}
+        self.entry.position_sizing_service = PositionSizingService(
+            config=load_position_sizing_config(overrides=ps_overrides)
+        )
+        self.entry.future_selection_service = FutureSelectionService(
+            config=load_future_selector_config()
+        )
+        self.entry.option_selector_service = OptionSelectorService(
+            config=load_option_selector_config(
+                overrides={"strike_level": self.entry.strike_level}
+            )
+        )
+
+        # ── Greeks 风控 & 订单执行增强 ──
+
+        greeks_risk_cfg = full_config.get("greeks_risk", {})
+        position_limits = greeks_risk_cfg.get("position_limits", {})
+        portfolio_limits = greeks_risk_cfg.get("portfolio_limits", {})
+
+        risk_thresholds = RiskThresholds(
+            position_delta_limit=position_limits.get("delta", 0.8),
+            position_gamma_limit=position_limits.get("gamma", 0.1),
+            position_vega_limit=position_limits.get("vega", 50.0),
+            portfolio_delta_limit=portfolio_limits.get("delta", 5.0),
+            portfolio_gamma_limit=portfolio_limits.get("gamma", 1.0),
+            portfolio_vega_limit=portfolio_limits.get("vega", 500.0),
+        )
+
+        order_exec_cfg = full_config.get("order_execution", {})
+        order_config = OrderExecutionConfig(
+            timeout_seconds=order_exec_cfg.get("timeout_seconds", 30),
+            max_retries=order_exec_cfg.get("max_retries", 3),
+            slippage_ticks=order_exec_cfg.get("slippage_ticks", 2),
+        )
+
+        self.entry.greeks_calculator = GreeksCalculator()
+        self.entry.portfolio_risk_aggregator = PortfolioRiskAggregator(risk_thresholds)
+        self.entry.smart_order_executor = SmartOrderExecutor(order_config)
+        self.entry.logger.info(f"Greeks 风控已启用: position_limits={position_limits}, portfolio_limits={portfolio_limits}")
+        self.entry.logger.info(f"订单执行增强已启用: timeout={order_config.timeout_seconds}s, max_retries={order_config.max_retries}")
+
+        # ______________________________  3. 创建领域聚合根  ______________________________
+
+        self.entry.target_aggregate = InstrumentManager()
+        self.entry.position_aggregate = PositionAggregate()
+        self.entry.combination_aggregate = CombinationAggregate()
+
+        # ______________________________  4. 创建基础设施组件  ______________________________
+
+        self.entry.market_gateway = VnpyMarketDataGateway(self.entry)
+        self.entry.account_gateway = VnpyAccountGateway(self.entry)
+        self.entry.exec_gateway = VnpyTradeExecutionGateway(self.entry)
+
+        variant_name = self.entry.strategy_name
+
+        monitor_db_config = {
+            "host": os.getenv("VNPY_DATABASE_HOST", "") or "",
+            "port": int(os.getenv("VNPY_DATABASE_PORT", "5432") or 5432),
+            "user": os.getenv("VNPY_DATABASE_USER", "") or "",
+            "password": os.getenv("VNPY_DATABASE_PASSWORD", "") or "",
+            "database": os.getenv("VNPY_DATABASE_DATABASE", "") or "",
+        }
+        self.entry.monitor = StrategyMonitor(
+            variant_name=variant_name,
+            monitor_instance_id=os.getenv("MONITOR_INSTANCE_ID", "default") or "default",
+            monitor_db_config=monitor_db_config,
+            logger=self.entry.logger
+        )
+
+        # 创建 JsonSerializer 实例，供 StateRepository 和 AutoSaveService 共享
+        self.entry.json_serializer = JsonSerializer()
+
+        self.entry.state_repository = StateRepository(
+            serializer=self.entry.json_serializer,
+            database_factory=DatabaseFactory.get_instance(),
+            logger=self.entry.logger,
+        )
+
+        # AutoSaveService 仅在非回测模式下创建
+        if not self.entry.backtesting:
+            self.entry.auto_save_service = AutoSaveService(
+                state_repository=self.entry.state_repository,
+                strategy_name=self.entry.strategy_name,
+                serializer=self.entry.json_serializer,
+                interval_seconds=60.0,
+                cleanup_interval_hours=24.0,
+                keep_days=7,
+                logger=self.entry.logger,
+            )
+
+        # 初始快照
+        self.entry._record_snapshot()
+
+        # ______________________________  5. 初始化K线合成管道  ______________________________
+
+        bar_window = int(self.entry.setting.get("bar_window", 0))
+        if bar_window > 0:
+            bar_interval_str = self.entry.setting.get("bar_interval", "MINUTE")
+            interval_map = {
+                "MINUTE": Interval.MINUTE,
+                "HOUR": Interval.HOUR,
+                "DAILY": Interval.DAILY,
+            }
+            interval = interval_map.get(bar_interval_str, Interval.MINUTE)
+            self.entry.bar_pipeline = BarPipeline(
+                bar_callback=self.entry._process_bars,
+                window=bar_window,
+                interval=interval,
+            )
+            self.entry.logger.info(f"K线合成管道已启用: {bar_window}{bar_interval_str}")
+        else:
+            self.entry.logger.info("未配置K线合成，使用直通模式")
+
+        # ______________________________  6. warmup  ______________________________
+
+        original_trading = getattr(self.entry, "trading", True)
+
+        if self.entry.backtesting:
+            self.entry.logger.info("当前处于回测模式，跳过状态恢复，直接加载历史数据进行初始化")
+            self.entry.warming_up = True
+            setattr(self.entry, "trading", False)
+            try:
+                self.entry.load_bars(self.entry.warmup_days)
+            except Exception:
+                self.entry.logger.error("回测 warmup 失败", exc_info=True)
+                raise
+            finally:
+                setattr(self.entry, "trading", original_trading)
+                self.entry.warming_up = False
+        else:
+            # 实盘 warmup: load_state + universe_validation + Postgres replay
+            try:
+                result = self.entry.state_repository.load(self.entry.strategy_name)
+                if isinstance(result, ArchiveNotFound):
+                    self.entry.logger.info(f"首次启动，无历史状态: {self.entry.strategy_name}")
+                else:
+                    # Restore aggregates from snapshot
+                    if "target_aggregate" in result:
+                        self.entry.target_aggregate = InstrumentManager.from_snapshot(result["target_aggregate"])
+                    if "position_aggregate" in result:
+                        self.entry.position_aggregate = PositionAggregate.from_snapshot(result["position_aggregate"])
+                    if "combination_aggregate" in result:
+                        self.entry.combination_aggregate = CombinationAggregate.from_snapshot(result["combination_aggregate"])
+                    if "current_dt" in result:
+                        self.entry.current_dt = result["current_dt"]
+                    self.entry.logger.info(f"策略状态已恢复: {self.entry.strategy_name}")
+            except CorruptionError as e:
+                self.entry.logger.error(f"策略状态损坏，拒绝启动: {e}")
+                raise
+            except Exception:
+                self.entry.logger.error(f"加载策略状态失败: {self.entry.strategy_name}", exc_info=True)
+                raise
+
+            try:
+                self.entry._validate_universe()
+            except Exception:
+                self.entry.logger.error("实盘补漏/主力合约初始化失败", exc_info=True)
+                raise
+
+            active_contracts = list(self.entry.target_aggregate.get_all_active_contracts() or [])
+            if isinstance(getattr(self.entry, "vt_symbols", None), list):
+                for vt_symbol in active_contracts:
+                    if vt_symbol and vt_symbol not in self.entry.vt_symbols:
+                        self.entry.vt_symbols.append(vt_symbol)
+
+            self.entry.warming_up = True
+            setattr(self.entry, "trading", False)
+            try:
+                vt_symbols = list(self.entry.target_aggregate.get_all_active_contracts() or [])
+                if not vt_symbols and isinstance(getattr(self.entry, "vt_symbols", None), list):
+                    vt_symbols = list(self.entry.vt_symbols)
+
+                ok = self.entry.history_repo.replay_bars_from_database(
+                    vt_symbols=vt_symbols,
+                    days=self.entry.warmup_days,
+                    on_bars_callback=self.entry.on_bars,  # on_bars 内部根据 bar_pipeline 分支
+                )
+                if not ok:
+                    self.entry.logger.error("实盘 warmup 失败: Postgres 中未能回放到有效 K 线")
+                    raise RuntimeError("live warmup failed")
+            except Exception:
+                self.entry.logger.error("实盘 warmup 执行失败（可能是 BarPipeline 处理异常）", exc_info=True)
+                raise
+            finally:
+                setattr(self.entry, "trading", original_trading)
+                self.entry.warming_up = False
+
+        # ______________________________  7. 注册飞书告警  ______________________________
+
+        if self.entry.feishu_webhook:
+            self.entry.feishu_handler = FeishuEventHandler(
+                webhook_url=self.entry.feishu_webhook,
+                strategy_name=self.entry.strategy_name
+            )
+            if hasattr(self.entry, "strategy_engine") and hasattr(self.entry.strategy_engine, "event_engine"):
+                self.entry.strategy_engine.event_engine.register(
+                    EVENT_STRATEGY_ALERT,
+                    self.entry.feishu_handler.handle_alert_event
+                )
+                self.entry.logger.info("飞书通知已启用")
+
+        self.entry.logger.info("策略初始化完成")
+
+    def on_start(self) -> None:
+        """Run start hook and initialize subscriptions."""
+        try:
+            StrategyTemplate.on_start(self.entry)
+        except Exception:
+            pass
+        self.entry.logger.info("策略启动")
+        self.entry._validate_universe()
+        self.entry._reconcile_subscriptions("on_init")
+
+    def on_stop(self) -> None:
+        """Run stop hook, persist state, and cleanup handlers."""
+        try:
+            StrategyTemplate.on_stop(self.entry)
+        except Exception:
+            pass
+        self.entry.logger.info("策略停止")
+
+        # 保存状态并关闭线程池 - 仅在非回测模式下
+        if self.entry.auto_save_service:
+            self.entry.auto_save_service.force_save(self.entry._create_snapshot)
+            self.entry.auto_save_service.shutdown()
+
+        # 注销飞书处理器
+        if self.entry.feishu_handler:
+            if hasattr(self.entry, "strategy_engine") and hasattr(self.entry.strategy_engine, "event_engine"):
+                try:
+                    self.entry.strategy_engine.event_engine.unregister(
+                        EVENT_STRATEGY_ALERT,
+                        self.entry.feishu_handler.handle_alert_event
+                    )
+                except Exception:
+                    pass

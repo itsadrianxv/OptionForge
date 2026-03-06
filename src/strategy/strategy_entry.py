@@ -3,74 +3,51 @@ StrategyEntry - 商品波动率策略入口 (Pragmatic DDD)
 
 VnPy 策略模板实现，同时充当应用层。
 on_* 回调直接编排领域逻辑，不再经过独立的 Application Service。
-
-设计原则:
-1. StrategyEntry = 接口层 + 应用层 (pragmatic approach)
-2. 领域逻辑仍然封装在 domain 层 (聚合根、领域服务)
-3. 基础设施逻辑仍然封装在 infrastructure 层 (网关、持久化、监控)
-4. 依赖注入: self 直接持有领域服务和基础设施组件
 """
-from typing import Any, Dict, List, Optional, Set
-from pathlib import Path
+
+from __future__ import annotations
+
+from datetime import datetime
 import os
-from datetime import datetime, date
-import time
+from typing import Any, Dict, List, Optional, Set
 
-
-from vnpy_portfoliostrategy import StrategyTemplate, StrategyEngine
-from vnpy.trader.object import BarData, OrderData, TradeData, PositionData, TickData
-from vnpy.trader.constant import Interval
+from vnpy.event.engine import Event
+from vnpy.trader.object import BarData, OrderData, PositionData, TickData, TradeData
+from vnpy_portfoliostrategy import StrategyEngine, StrategyTemplate
 
 from src.strategy.infrastructure.bar_pipeline import BarPipeline
-from vnpy.event.engine import Event
 
-
-from .domain.aggregate.target_instrument_aggregate import InstrumentManager
-from .domain.aggregate.position_aggregate import PositionAggregate
+from .application import (
+    EventBridge,
+    LifecycleWorkflow,
+    MarketWorkflow,
+    StateWorkflow,
+    SubscriptionWorkflow,
+)
 from .domain.aggregate.combination_aggregate import CombinationAggregate
-from .domain.domain_service.signal.indicator_service import IndicatorService
-from .domain.domain_service.signal.signal_service import SignalService
-# NOTE: IndicatorService 和 SignalService 是模板类，
-# 使用前请根据策略需求实现 calculate_bar() / check_open_signal() / check_close_signal()
-from .domain.domain_service.risk.position_sizing_service import PositionSizingService
-from .domain.domain_service.selection.option_selector_service import OptionSelectorService
-from .domain.domain_service.selection.future_selection_service import FutureSelectionService
+from .domain.aggregate.position_aggregate import PositionAggregate
+from .domain.aggregate.target_instrument_aggregate import InstrumentManager
+from .domain.domain_service.execution.smart_order_executor import SmartOrderExecutor
 from .domain.domain_service.pricing import GreeksCalculator
 from .domain.domain_service.risk.portfolio_risk_aggregator import PortfolioRiskAggregator
-from .domain.domain_service.execution.smart_order_executor import SmartOrderExecutor
-from .domain.event.event_types import (
-    EVENT_STRATEGY_ALERT,
-    CombinationStatusChangedEvent,
-    DomainEvent,
-    ManualCloseDetectedEvent,
-    ManualOpenDetectedEvent,
-    PositionClosedEvent,
-    RiskLimitExceededEvent,
-    GreeksRiskBreachEvent,
-    OrderTimeoutEvent,
-    OrderRetryExhaustedEvent,
-    StrategyAlertData,
-)
-from .domain.value_object.risk import RiskThresholds
-from .domain.value_object.order_execution import OrderExecutionConfig
-from .infrastructure.gateway.vnpy_market_data_gateway import VnpyMarketDataGateway
+from .domain.domain_service.risk.position_sizing_service import PositionSizingService
+from .domain.domain_service.selection.future_selection_service import FutureSelectionService
+from .domain.domain_service.selection.option_selector_service import OptionSelectorService
+from .domain.domain_service.signal.indicator_service import IndicatorService
+from .domain.domain_service.signal.signal_service import SignalService
+from .domain.event.event_types import PositionClosedEvent
+from .domain.value_object.selection.selection import MarketData as SelectionMarketData
 from .infrastructure.gateway.vnpy_account_gateway import VnpyAccountGateway
+from .infrastructure.gateway.vnpy_market_data_gateway import VnpyMarketDataGateway
 from .infrastructure.gateway.vnpy_trade_execution_gateway import VnpyTradeExecutionGateway
-from .infrastructure.reporting.feishu_handler import FeishuEventHandler
 from .infrastructure.logging.logging_utils import setup_strategy_logger
 from .infrastructure.monitoring.strategy_monitor import StrategyMonitor
-from .infrastructure.persistence.state_repository import StateRepository, ArchiveNotFound
-from .infrastructure.persistence.json_serializer import JsonSerializer
 from .infrastructure.persistence.auto_save_service import AutoSaveService
-from .infrastructure.persistence.exceptions import CorruptionError
 from .infrastructure.persistence.history_data_repository import HistoryDataRepository
-from src.main.bootstrap.database_factory import DatabaseFactory
-from .infrastructure.parsing.contract_helper import ContractHelper
-from .infrastructure.subscription.subscription_mode_engine import (
-    SubscriptionModeEngine,
-    SubscriptionRuntimeContext,
-)
-from .domain.value_object.selection.selection import MarketData as SelectionMarketData
+from .infrastructure.persistence.json_serializer import JsonSerializer
+from .infrastructure.persistence.state_repository import StateRepository
+from .infrastructure.reporting.feishu_handler import FeishuEventHandler
+from .infrastructure.subscription.subscription_mode_engine import SubscriptionModeEngine
 
 
 class StrategyEntry(StrategyTemplate):
@@ -79,17 +56,10 @@ class StrategyEntry(StrategyTemplate):
 
     职责:
     1. VnPy 回调入口 (on_* 方法)
-    2. 编排领域逻辑 (原 StrategyEngine 的 handle_* 职责)
-    3. 组装依赖 (在 on_init 中初始化领域服务和基础设施)
-
-    参数:
-    - feishu_webhook: 飞书群机器人 Webhook URL
-    - max_positions: 最大持仓数量
-    - position_ratio: 单次开仓资金比例
-    - strike_level: 虚值档位
+    2. 编排领域逻辑
+    3. 组装依赖
     """
 
-    # 策略参数
     author = "Hongxu Lai"
 
     # 标的合约列表 (期货)
@@ -105,7 +75,6 @@ class StrategyEntry(StrategyTemplate):
     # 期权选择
     strike_level: int = 3
 
-    # VnPy 参数声明
     parameters = [
         "feishu_webhook",
         "max_positions",
@@ -118,7 +87,7 @@ class StrategyEntry(StrategyTemplate):
         strategy_engine: StrategyEngine,
         strategy_name: str,
         vt_symbols: list,
-        setting: dict
+        setting: dict,
     ) -> None:
         super().__init__(strategy_engine, strategy_name, vt_symbols, setting)
 
@@ -157,11 +126,6 @@ class StrategyEntry(StrategyTemplate):
         self.greeks_calculator: Optional[GreeksCalculator] = None
         self.portfolio_risk_aggregator: Optional[PortfolioRiskAggregator] = None
         self.smart_order_executor: Optional[SmartOrderExecutor] = None
-        # --- 执行编排参考（默认注释，不启用）---
-        # self.advanced_order_scheduler: Optional[AdvancedOrderScheduler] = None
-        # self._child_to_vt_orderid: Dict[str, str] = {}
-        # self._vt_orderid_to_child: Dict[str, str] = {}
-        # self._child_to_parent_order: Dict[str, str] = {}
 
         # ── 基础设施网关 (在 on_init 中初始化) ──
         self.market_gateway: Optional[VnpyMarketDataGateway] = None
@@ -172,6 +136,7 @@ class StrategyEntry(StrategyTemplate):
         self.monitor: Optional[StrategyMonitor] = None
         self.state_repository: Optional[StateRepository] = None
         self.auto_save_service: Optional[AutoSaveService] = None
+        self.json_serializer: Optional[JsonSerializer] = None
 
         # ── 飞书 ──
         self.feishu_handler: Optional[FeishuEventHandler] = None
@@ -202,1116 +167,118 @@ class StrategyEntry(StrategyTemplate):
         self.warming_up: bool = False
         self.current_dt: datetime = datetime.now()
 
+        # ── 应用层切片 ──
+        self.lifecycle_workflow = LifecycleWorkflow(self)
+        self.market_workflow = MarketWorkflow(self)
+        self.subscription_workflow = SubscriptionWorkflow(self)
+        self.state_workflow = StateWorkflow(self)
+        self.event_bridge = EventBridge(self)
+
     # ═══════════════════════════════════════════════════════════════════
     #  VnPy 生命周期回调
     # ═══════════════════════════════════════════════════════════════════
 
     def on_init(self) -> None:
-        """
-        策略初始化回调
-
-        组装依赖并初始化:
-        1. 加载交易品种配置
-        2. 创建领域服务
-        3. 创建领域聚合根
-        4. 创建基础设施组件 (网关、监控、持久化)
-        5. 初始化K线生成器
-        6. warmup
-        7. 注册飞书告警
-        """
-        self.logger.info("策略初始化...")
-
-        # ______________________________  1. 加载交易品种配置  ______________________________
-
-        from src.main.config.config_loader import ConfigLoader
-        self.target_products = ConfigLoader.load_target_products()
-        if not self.target_products:
-            self.logger.error("未配置任何交易品种，请先检查并配置 trading_target.toml")
-            raise RuntimeError("策略初始化失败：未配置交易品种")
-        self.logger.info(f"已加载配置的标的: {len(self.target_products)} 个品种")
-
-        # ______________________________  2. 创建领域服务  ______________________________
-
-        # ── 加载 strategy_config.toml ──
-        try:
-            strategy_config_path = str(Path(__file__).resolve().parents[2] / "config" / "strategy_config.toml")
-            full_config = ConfigLoader.load_toml(strategy_config_path)
-        except Exception:
-            full_config = {}
-
-        try:
-            subscription_config_path = Path(__file__).resolve().parents[2] / "config" / "subscription" / "subscription.toml"
-            if subscription_config_path.exists():
-                self.subscription_config = ConfigLoader.load_toml(str(subscription_config_path))
-            else:
-                self.subscription_config = {"enabled": False}
-        except Exception as e:
-            self.logger.warning(f"加载订阅配置失败，将禁用订阅模式引擎: {e}")
-            self.subscription_config = {"enabled": False}
-        self._init_subscription_management()
-
-        self.indicator_service = IndicatorService()
-        self.signal_service = SignalService()
-
-        # ── 从 TOML 配置 + YAML 覆盖加载领域服务配置 ──
-        from src.main.config.domain_service_config_loader import (
-            load_position_sizing_config,
-            load_pricing_engine_config,
-            load_future_selector_config,
-            load_option_selector_config,
-        )
-
-        ps_cfg = full_config.get("position_sizing", {})
-        ps_overrides = {**ps_cfg, "max_positions": self.max_positions}
-        self.position_sizing_service = PositionSizingService(
-            config=load_position_sizing_config(overrides=ps_overrides)
-        )
-        self.future_selection_service = FutureSelectionService(
-            config=load_future_selector_config()
-        )
-        self.option_selector_service = OptionSelectorService(
-            config=load_option_selector_config(
-                overrides={"strike_level": self.strike_level}
-            )
-        )
-
-        # ── Greeks 风控 & 订单执行增强 ──
-
-        greeks_risk_cfg = full_config.get("greeks_risk", {})
-        position_limits = greeks_risk_cfg.get("position_limits", {})
-        portfolio_limits = greeks_risk_cfg.get("portfolio_limits", {})
-
-        risk_thresholds = RiskThresholds(
-            position_delta_limit=position_limits.get("delta", 0.8),
-            position_gamma_limit=position_limits.get("gamma", 0.1),
-            position_vega_limit=position_limits.get("vega", 50.0),
-            portfolio_delta_limit=portfolio_limits.get("delta", 5.0),
-            portfolio_gamma_limit=portfolio_limits.get("gamma", 1.0),
-            portfolio_vega_limit=portfolio_limits.get("vega", 500.0),
-        )
-
-        order_exec_cfg = full_config.get("order_execution", {})
-        order_config = OrderExecutionConfig(
-            timeout_seconds=order_exec_cfg.get("timeout_seconds", 30),
-            max_retries=order_exec_cfg.get("max_retries", 3),
-            slippage_ticks=order_exec_cfg.get("slippage_ticks", 2),
-        )
-
-        self.greeks_calculator = GreeksCalculator()
-        self.portfolio_risk_aggregator = PortfolioRiskAggregator(risk_thresholds)
-        self.smart_order_executor = SmartOrderExecutor(order_config)
-        self.logger.info(f"Greeks 风控已启用: position_limits={position_limits}, portfolio_limits={portfolio_limits}")
-        self.logger.info(f"订单执行增强已启用: timeout={order_config.timeout_seconds}s, max_retries={order_config.max_retries}")
-
-        # --- 执行编排参考（默认注释，不启用）---
-        # from src.main.config.domain_service_config_loader import load_advanced_scheduler_config
-        # from src.strategy.domain.domain_service.execution.advanced_order_scheduler import AdvancedOrderScheduler
-        # self.advanced_order_scheduler = AdvancedOrderScheduler(
-        #     config=load_advanced_scheduler_config()
-        # )
-        # self._child_to_vt_orderid = {}
-        # self._vt_orderid_to_child = {}
-        # self._child_to_parent_order = {}
-
-        # ______________________________  3. 创建领域聚合根  ______________________________
-
-        self.target_aggregate = InstrumentManager()
-        self.position_aggregate = PositionAggregate()
-        self.combination_aggregate = CombinationAggregate()
-
-        # ______________________________  4. 创建基础设施组件  ______________________________
-
-        self.market_gateway = VnpyMarketDataGateway(self)
-        self.account_gateway = VnpyAccountGateway(self)
-        self.exec_gateway = VnpyTradeExecutionGateway(self)
-
-        variant_name = self.strategy_name
-
-        monitor_db_config = {
-            "host": os.getenv("VNPY_DATABASE_HOST", "") or "",
-            "port": int(os.getenv("VNPY_DATABASE_PORT", "5432") or 5432),
-            "user": os.getenv("VNPY_DATABASE_USER", "") or "",
-            "password": os.getenv("VNPY_DATABASE_PASSWORD", "") or "",
-            "database": os.getenv("VNPY_DATABASE_DATABASE", "") or "",
-        }
-        self.monitor = StrategyMonitor(
-            variant_name=variant_name,
-            monitor_instance_id=os.getenv("MONITOR_INSTANCE_ID", "default") or "default",
-            monitor_db_config=monitor_db_config,
-            logger=self.logger
-        )
-        
-        # 创建 JsonSerializer 实例，供 StateRepository 和 AutoSaveService 共享
-        self.json_serializer = JsonSerializer()
-        
-        self.state_repository = StateRepository(
-            serializer=self.json_serializer,
-            database_factory=DatabaseFactory.get_instance(),
-            logger=self.logger,
-        )
-
-        # AutoSaveService 仅在非回测模式下创建
-        if not self.backtesting:
-            self.auto_save_service = AutoSaveService(
-                state_repository=self.state_repository,
-                strategy_name=self.strategy_name,
-                serializer=self.json_serializer,
-                interval_seconds=60.0,
-                cleanup_interval_hours=24.0,
-                keep_days=7,
-                logger=self.logger,
-            )
-
-        # 初始快照
-        self._record_snapshot()
-
-        # ______________________________  5. 初始化K线合成管道  ______________________________
-
-        bar_window = int(self.setting.get("bar_window", 0))
-        if bar_window > 0:
-            bar_interval_str = self.setting.get("bar_interval", "MINUTE")
-            interval_map = {
-                "MINUTE": Interval.MINUTE,
-                "HOUR": Interval.HOUR,
-                "DAILY": Interval.DAILY,
-            }
-            interval = interval_map.get(bar_interval_str, Interval.MINUTE)
-            self.bar_pipeline = BarPipeline(
-                bar_callback=self._process_bars,
-                window=bar_window,
-                interval=interval,
-            )
-            self.logger.info(f"K线合成管道已启用: {bar_window}{bar_interval_str}")
-        else:
-            self.logger.info("未配置K线合成，使用直通模式")
-
-        # ______________________________  6. warmup  ______________________________
-
-        original_trading = getattr(self, "trading", True)
-
-        if self.backtesting:
-            self.logger.info("当前处于回测模式，跳过状态恢复，直接加载历史数据进行初始化")
-            self.warming_up = True
-            setattr(self, "trading", False)
-            try:
-                self.load_bars(self.warmup_days)
-            except Exception:
-                self.logger.error("回测 warmup 失败", exc_info=True)
-                raise
-            finally:
-                setattr(self, "trading", original_trading)
-                self.warming_up = False
-        else:
-            # 实盘 warmup: load_state + universe_validation + Postgres replay
-            try:
-                result = self.state_repository.load(self.strategy_name)
-                if isinstance(result, ArchiveNotFound):
-                    self.logger.info(f"首次启动，无历史状态: {self.strategy_name}")
-                else:
-                    # Restore aggregates from snapshot
-                    if "target_aggregate" in result:
-                        self.target_aggregate = InstrumentManager.from_snapshot(result["target_aggregate"])
-                    if "position_aggregate" in result:
-                        self.position_aggregate = PositionAggregate.from_snapshot(result["position_aggregate"])
-                    if "combination_aggregate" in result:
-                        self.combination_aggregate = CombinationAggregate.from_snapshot(result["combination_aggregate"])
-                    if "current_dt" in result:
-                        self.current_dt = result["current_dt"]
-                    self.logger.info(f"策略状态已恢复: {self.strategy_name}")
-            except CorruptionError as e:
-                self.logger.error(f"策略状态损坏，拒绝启动: {e}")
-                raise
-            except Exception:
-                self.logger.error(f"加载策略状态失败: {self.strategy_name}", exc_info=True)
-                raise
-
-            try:
-                self._validate_universe()
-            except Exception:
-                self.logger.error("实盘补漏/主力合约初始化失败", exc_info=True)
-                raise
-
-            active_contracts = list(self.target_aggregate.get_all_active_contracts() or [])
-            if isinstance(getattr(self, "vt_symbols", None), list):
-                for vt_symbol in active_contracts:
-                    if vt_symbol and vt_symbol not in self.vt_symbols:
-                        self.vt_symbols.append(vt_symbol)
-
-            self.warming_up = True
-            setattr(self, "trading", False)
-            try:
-                vt_symbols = list(self.target_aggregate.get_all_active_contracts() or [])
-                if not vt_symbols and isinstance(getattr(self, "vt_symbols", None), list):
-                    vt_symbols = list(self.vt_symbols)
-
-                ok = self.history_repo.replay_bars_from_database(
-                    vt_symbols=vt_symbols,
-                    days=self.warmup_days,
-                    on_bars_callback=self.on_bars,  # on_bars 内部根据 bar_pipeline 分支
-                )
-                if not ok:
-                    self.logger.error("实盘 warmup 失败: Postgres 中未能回放到有效 K 线")
-                    raise RuntimeError("live warmup failed")
-            except Exception:
-                self.logger.error("实盘 warmup 执行失败（可能是 BarPipeline 处理异常）", exc_info=True)
-                raise
-            finally:
-                setattr(self, "trading", original_trading)
-                self.warming_up = False
-
-        # ______________________________  7. 注册飞书告警  ______________________________
-
-        if self.feishu_webhook:
-            self.feishu_handler = FeishuEventHandler(
-                webhook_url=self.feishu_webhook,
-                strategy_name=self.strategy_name
-            )
-            if hasattr(self, "strategy_engine") and hasattr(self.strategy_engine, "event_engine"):
-                self.strategy_engine.event_engine.register(
-                    EVENT_STRATEGY_ALERT,
-                    self.feishu_handler.handle_alert_event
-                )
-                self.logger.info("飞书通知已启用")
-
-        self.logger.info("策略初始化完成")
+        self.lifecycle_workflow.on_init()
 
     def on_start(self) -> None:
-        """策略启动时执行验证和订阅初始化"""
-        try:
-            super().on_start()
-        except Exception:
-            pass
-        self.logger.info("策略启动")
-        self._validate_universe()
-        self._reconcile_subscriptions("on_init")
+        self.lifecycle_workflow.on_start()
 
     def on_stop(self) -> None:
-        """策略停止时保存状态并清理资源"""
-        try:
-            super().on_stop()
-        except Exception:
-            pass
-        self.logger.info("策略停止")
-
-        # 保存状态并关闭线程池 - 仅在非回测模式下
-        if self.auto_save_service:
-            self.auto_save_service.force_save(self._create_snapshot)
-            self.auto_save_service.shutdown()
-
-        # 注销飞书处理器
-        if self.feishu_handler:
-            if hasattr(self, "strategy_engine") and hasattr(self.strategy_engine, "event_engine"):
-                try:
-                    self.strategy_engine.event_engine.unregister(
-                        EVENT_STRATEGY_ALERT,
-                        self.feishu_handler.handle_alert_event
-                    )
-                except Exception:
-                    pass
+        self.lifecycle_workflow.on_stop()
 
     # ═══════════════════════════════════════════════════════════════════
-    #  VnPy 数据回调 — 直接编排领域逻辑
+    #  VnPy 数据回调
     # ═══════════════════════════════════════════════════════════════════
 
     def on_tick(self, tick: TickData) -> None:
-        """处理 Tick 数据推送"""
-        if self.bar_pipeline:
-            self.bar_pipeline.handle_tick(tick)
+        self.market_workflow.on_tick(tick)
 
     def on_bars(self, bars: Dict[str, BarData]) -> None:
-        """
-        K 线推送回调（1分钟K线）
-
-        如果启用了K线合成器，则推送给合成器；否则直接处理。
-        同时处理换月检查和补漏检查。
-        """
-        self.last_bars.update(bars)
-
-        if self.target_aggregate and not self.warming_up:
-            first_bar = next(iter(bars.values()))
-            current_dt = first_bar.datetime
-            rollover_changed = False
-
-            # 每日换月检查 (14:50)
-            if current_dt.hour == 14 and current_dt.minute == 50:
-                if not self.rollover_check_done:
-                    self.logger.info(f"触发每日换月检查: {current_dt}")
-                    if self.target_aggregate and self.market_gateway:
-                        for product in self.target_products:
-                            try:
-                                current_vt = self.target_aggregate.get_active_contract(product)
-                                if not current_vt:
-                                    continue
-
-                                all_contracts = self.market_gateway.get_all_contracts()
-                                product_contracts = [
-                                    c for c in all_contracts
-                                    if ContractHelper.is_contract_of_product(c, product)
-                                ]
-                                if not product_contracts:
-                                    continue
-
-                                market_data = self._build_future_market_data(product_contracts)
-                                dominant = self.future_selection_service.select_dominant_contract(
-                                    product_contracts,
-                                    current_dt.date(),
-                                    market_data=market_data,
-                                    log_func=self.logger.info,
-                                )
-                                if dominant and dominant.vt_symbol != current_vt:
-                                    new_vt = dominant.vt_symbol
-                                    self.logger.info(
-                                        f"品种 {product} 换月: {current_vt} -> {new_vt}"
-                                    )
-                                    self.target_aggregate.set_active_contract(product, new_vt)
-                                    self.target_aggregate.get_or_create_instrument(new_vt)
-                                    self._subscribe_symbol(new_vt)
-                                    rollover_changed = True
-                            except Exception as e:
-                                self.logger.error(f"品种 {product} 换月检查失败: {e}")
-                    self.rollover_check_done = True
-            else:
-                self.rollover_check_done = False
-
-            # 定期补漏检查
-            self.universe_check_interval += 1
-            if self.universe_check_interval >= self.universe_check_threshold:
-                self.universe_check_interval = 0
-                self._validate_universe()
-
-            if rollover_changed:
-                self._reconcile_subscriptions("on_rollover")
-
-        if self.bar_pipeline:
-            self.bar_pipeline.handle_bars(bars)
-        else:
-            self._process_bars(bars)
-        # --- 执行编排参考（默认注释，不启用）---
-        # if not self.warming_up:
-        #     self._dispatch_pending_advanced_children(current_time=datetime.now())
-        #     self._check_execution_timeouts_and_retry(current_time=datetime.now())
-
-        # 周期性自动保存 (非回测模式)
-        if self.auto_save_service and not self.warming_up:
-            self.auto_save_service.maybe_save(self._create_snapshot)
-
-        if not self.warming_up:
-            now_ts = time.time()
-            if now_ts - self._last_subscription_refresh_ts >= self.subscription_refresh_sec:
-                self._last_subscription_refresh_ts = now_ts
-                self._reconcile_subscriptions("timer")
+        self.market_workflow.on_bars(bars)
 
     def on_order(self, order: OrderData) -> None:
-        """
-        订单推送回调 — 直接更新 PositionAggregate
-        """
-        if not self.position_aggregate:
-            return
-        order_data = {
-            "vt_orderid": order.vt_orderid,
-            "vt_symbol": order.vt_symbol,
-            "direction": order.direction.value if hasattr(order.direction, "value") else str(order.direction),
-            "offset": order.offset.value if hasattr(order.offset, "value") else str(order.offset),
-            "price": order.price,
-            "volume": order.volume,
-            "traded": order.traded,
-            "status": order.status.value if hasattr(order.status, "value") else str(order.status),
-        }
-        self.position_aggregate.update_from_order(order_data)
-        # --- 执行编排参考（默认注释，不启用）---
-        # if self.smart_order_executor:
-        #     status_text = order_data["status"].lower()
-        #     if "alltraded" in status_text or "filled" in status_text:
-        #         self.smart_order_executor.mark_order_filled(order.vt_orderid)
-        #     elif "cancelled" in status_text or "rejected" in status_text:
-        #         self.smart_order_executor.mark_order_cancelled(order.vt_orderid)
-        #
-        # child_id = self._vt_orderid_to_child.get(order.vt_orderid)
-        # if child_id and ("cancelled" in status_text or "rejected" in status_text):
-        #     self._vt_orderid_to_child.pop(order.vt_orderid, None)
-        #     self._child_to_vt_orderid.pop(child_id, None)
-        #     self._child_to_parent_order.pop(child_id, None)
-        self._publish_domain_events()
-        self._reconcile_subscriptions("on_order")
+        self.event_bridge.on_order(order)
 
     def on_trade(self, trade: TradeData) -> None:
-        """
-        成交推送回调 — 直接更新 PositionAggregate
-        """
-        if not self.position_aggregate:
-            return
-        trade_data = {
-            "vt_tradeid": trade.vt_tradeid,
-            "vt_orderid": trade.vt_orderid,
-            "vt_symbol": trade.vt_symbol,
-            "direction": trade.direction.value if hasattr(trade.direction, "value") else str(trade.direction),
-            "offset": trade.offset.value if hasattr(trade.offset, "value") else str(trade.offset),
-            "price": trade.price,
-            "volume": trade.volume,
-            "datetime": trade.datetime,
-        }
-        self.position_aggregate.update_from_trade(trade_data)
-        # --- 执行编排参考（默认注释，不启用）---
-        # if self.smart_order_executor:
-        #     self.smart_order_executor.mark_order_filled(trade.vt_orderid)
-        #
-        # child_id = self._vt_orderid_to_child.get(trade.vt_orderid)
-        # if child_id and self.advanced_order_scheduler:
-        #     exec_events = self.advanced_order_scheduler.on_child_filled(child_id)
-        #     for evt in exec_events:
-        #         self.logger.info(f"执行领域事件: {evt.event_name} - {evt}")
-        #
-        #     self._vt_orderid_to_child.pop(trade.vt_orderid, None)
-        #     self._child_to_vt_orderid.pop(child_id, None)
-        #     self._child_to_parent_order.pop(child_id, None)
-        self._publish_domain_events()
-        self._reconcile_subscriptions("on_trade")
+        self.event_bridge.on_trade(trade)
 
     def process_position_event(self, event: Event) -> None:
-        """处理持仓事件"""
-        self.on_position(event.data)
+        self.event_bridge.process_position_event(event)
 
     def on_position(self, position: PositionData) -> None:
-        """
-        持仓推送回调 — 直接更新 PositionAggregate (检测手动平仓)
-        """
-        if not self.position_aggregate:
-            return
-        position_data = {
-            "vt_symbol": position.vt_symbol,
-            "direction": position.direction.value if hasattr(position.direction, "value") else str(position.direction),
-            "volume": position.volume,
-            "frozen": position.frozen,
-            "price": position.price,
-            "pnl": position.pnl,
-        }
-        self.position_aggregate.update_from_position(position_data)
-        self._publish_domain_events()
-        self._reconcile_subscriptions("on_position")
+        self.event_bridge.on_position(position)
 
     # ═══════════════════════════════════════════════════════════════════
-    #  核心编排逻辑 (原 StrategyEngine.handle_* 的职责)
+    #  核心编排逻辑委托
     # ═══════════════════════════════════════════════════════════════════
 
     def _process_bars(self, bars: Dict[str, BarData]) -> None:
-        """
-        处理 K 线更新 — 编排领域逻辑
-
-        流程:
-        1. 更新行情数据到 InstrumentManager
-        2. 调用 IndicatorService 计算指标
-        3. 调用 SignalService 检查开平仓信号
-        4. 协调开平仓业务流程
-        5. 记录监控快照
-        """
-        if not self.target_aggregate:
-            return
-
-        for vt_symbol, bar in bars.items():
-            bar_data = {
-                "datetime": bar.datetime,
-                "open": bar.open_price,
-                "high": bar.high_price,
-                "low": bar.low_price,
-                "close": bar.close_price,
-                "volume": bar.volume,
-            }
-            self.current_dt = bar.datetime
-
-            try:
-                # 1. 更新行情数据
-                instrument = self.target_aggregate.update_bar(vt_symbol, bar_data)
-
-                # 2. 计算指标
-                try:
-                    self.indicator_service.calculate_bar(instrument, bar_data)
-                except Exception as e:
-                    self.logger.error(f"指标计算失败 [{vt_symbol}]: {e}")
-                    continue
-
-                # 3. 检查开仓信号
-                try:
-                    open_signal = self.signal_service.check_open_signal(instrument)
-                    if open_signal:
-                        self.logger.info(f"检测到开仓信号 [{vt_symbol}]: {open_signal}")
-                        self._register_signal_temporary_symbol(vt_symbol)
-                        # TODO: 实现完整开仓逻辑
-                        # 1. 调用 OptionSelectorService 选择期权合约
-                        # 2. 调用 PositionSizingService 计算仓位
-                        # 3. 调用 VnpyTradeExecutionGateway 下单
-                        # 4. 在 PositionAggregate 中创建持仓记录
-                        self.logger.info(f"执行开仓: {vt_symbol}, 信号: {open_signal}")
-                except Exception as e:
-                    self.logger.error(f"开仓信号检查失败 [{vt_symbol}]: {e}")
-
-                # 4. 检查平仓信号
-                try:
-                    positions = self.position_aggregate.get_positions_by_underlying(vt_symbol)
-                    for position in positions:
-                        close_signal = self.signal_service.check_close_signal(
-                            instrument, position
-                        )
-                        if close_signal:
-                            self.logger.info(
-                                f"检测到平仓信号 [{position.vt_symbol}]: {close_signal}"
-                            )
-                            # TODO: 实现完整平仓逻辑
-                            # 1. 调用 PositionSizingService 计算平仓量
-                            # 2. 调用 VnpyTradeExecutionGateway 下单
-                            self.logger.info(f"执行平仓: {position.vt_symbol}, 信号: {close_signal}")
-                except Exception as e:
-                    self.logger.error(f"平仓信号检查失败 [{vt_symbol}]: {e}")
-
-            except Exception as e:
-                self.logger.error(f"处理 K 线更新失败 [{vt_symbol}]: {e}")
-
-        # 5. 记录快照
-        self._record_snapshot()
-
-    # ═══════════════════════════════════════════════════════════════════
-    #  标的池管理 
-    # ═══════════════════════════════════════════════════════════════════
+        self.market_workflow.process_bars(bars)
 
     def _validate_universe(self) -> None:
-        """
-        验证并初始化主力合约 (补漏)
-
-        遍历 target_products，为每个品种:
-        1. 检查是否已有活跃合约
-        2. 如果没有，通过 FutureSelectionService 选择主力合约
-        3. 订阅行情并注册到 InstrumentManager
-        """
-        if not self.target_aggregate or not self.market_gateway:
-            return
-
-        for product in self.target_products:
-            existing = self.target_aggregate.get_active_contract(product)
-            if existing:
-                continue
-
-            try:
-                all_contracts = self.market_gateway.get_all_contracts()
-                product_contracts = [
-                    c for c in all_contracts
-                    if ContractHelper.is_contract_of_product(c, product)
-                ]
-                if not product_contracts:
-                    self.logger.warning(f"品种 {product} 未找到可用合约")
-                    continue
-
-                market_data = self._build_future_market_data(product_contracts)
-                dominant = self.future_selection_service.select_dominant_contract(
-                    product_contracts, date.today(), market_data=market_data, log_func=self.logger.info
-                )
-                if dominant:
-                    vt_symbol = dominant.vt_symbol
-                    self.target_aggregate.set_active_contract(product, vt_symbol)
-                    self.target_aggregate.get_or_create_instrument(vt_symbol)
-                    self._subscribe_symbol(vt_symbol)
-                    self.logger.info(f"品种 {product} 主力合约: {vt_symbol}")
-            except Exception as e:
-                self.logger.error(f"品种 {product} 主力合约初始化失败: {e}")
-
-    def _init_subscription_management(self) -> None:
-        """初始化订阅模式引擎配置"""
-        cfg = dict(self.subscription_config or {})
-        if not cfg:
-            cfg = {"enabled": False}
-
-        self.subscription_config = cfg
-        self.subscription_engine = SubscriptionModeEngine(cfg)
-        self.subscription_enabled = bool(cfg.get("enabled", True))
-        self.subscription_trigger_events = {
-            str(item).strip()
-            for item in (cfg.get("trigger_events", []) or [])
-            if str(item).strip()
-        }
-        self.subscription_refresh_sec = max(1, int(cfg.get("refresh_sec", 15) or 15))
-        self._last_subscription_refresh_ts = time.time()
-
-        if self.subscription_enabled:
-            enabled_modes = cfg.get("enabled_modes", []) or []
-            self.logger.info(f"订阅模式引擎已启用: modes={enabled_modes}")
-        else:
-            self.logger.info("订阅模式引擎已禁用")
-
-    def _should_trigger_subscription(self, trigger: str) -> bool:
-        """判断是否应触发订阅重算"""
-        if not self.subscription_enabled:
-            return False
-        if not self.subscription_trigger_events:
-            return True
-        return trigger in self.subscription_trigger_events
-
-    def _register_signal_temporary_symbol(self, vt_symbol: str) -> None:
-        """注册信号驱动的临时订阅合约"""
-        if not vt_symbol:
-            return
-        signal_cfg = self.subscription_config.get("signal_driven_temporary", {}) if self.subscription_config else {}
-        ttl_sec = int(signal_cfg.get("ttl_sec", 180) or 180)
-        if ttl_sec <= 0:
-            return
-        self._signal_temp_symbols[vt_symbol] = time.time() + ttl_sec
-
-    def _collect_active_signal_symbols(self, now_ts: float) -> Set[str]:
-        """收集当前活跃的信号合约"""
-        active: Set[str] = set()
-        for symbol, expiry_ts in list(self._signal_temp_symbols.items()):
-            if expiry_ts <= now_ts:
-                self._signal_temp_symbols.pop(symbol, None)
-                continue
-            active.add(symbol)
-        return active
-
-    def _collect_position_symbols(self) -> Set[str]:
-        """收集当前持仓合约"""
-        result: Set[str] = set()
-
-        if self.account_gateway:
-            try:
-                for position in self.account_gateway.get_all_positions() or []:
-                    vt_symbol = str(getattr(position, "vt_symbol", "") or "")
-                    volume = float(getattr(position, "volume", 0) or 0)
-                    if vt_symbol and abs(volume) > 0:
-                        result.add(vt_symbol)
-            except Exception:
-                pass
-
-        if self.position_aggregate:
-            try:
-                for position in self.position_aggregate.get_active_positions():
-                    vt_symbol = str(getattr(position, "vt_symbol", "") or "")
-                    if vt_symbol:
-                        result.add(vt_symbol)
-            except Exception:
-                pass
-
-        return result
-
-    def _collect_pending_order_symbols(self) -> Set[str]:
-        """收集当前挂单合约"""
-        result: Set[str] = set()
-        if not self.position_aggregate:
-            return result
-
-        try:
-            for order in self.position_aggregate.get_all_pending_orders():
-                is_active = bool(getattr(order, "is_active", True))
-                vt_symbol = str(getattr(order, "vt_symbol", "") or "")
-                if is_active and vt_symbol:
-                    result.add(vt_symbol)
-        except Exception:
-            pass
-
-        return result
-
-    def _get_active_contract_map(self) -> Dict[str, str]:
-        """获取品种到主力合约的映射"""
-        mapping: Dict[str, str] = {}
-        if not self.target_aggregate:
-            return mapping
-
-        for product in self.target_products:
-            vt_symbol = self.target_aggregate.get_active_contract(product)
-            if vt_symbol:
-                mapping[str(product).upper()] = vt_symbol
-        return mapping
-
-    def _get_last_price(self, vt_symbol: str) -> float:
-        """获取合约最新价格"""
-        if not self.market_gateway:
-            return 0.0
-        tick = self.market_gateway.get_tick(vt_symbol)
-        if not tick:
-            return 0.0
-        try:
-            return float(getattr(tick, "last_price", 0) or 0)
-        except (TypeError, ValueError):
-            return 0.0
-
-    def _subscribe_symbol(self, vt_symbol: str) -> bool:
-        """订阅合约行情"""
-        if not self.market_gateway or not vt_symbol:
-            return False
-        ok = self.market_gateway.subscribe(vt_symbol)
-        if ok:
-            self.subscribed_symbols.add(vt_symbol)
-        return ok
-
-    def _unsubscribe_symbol(self, vt_symbol: str) -> bool:
-        """取消订阅合约行情"""
-        if not self.market_gateway or not vt_symbol:
-            return False
-        ok = self.market_gateway.unsubscribe(vt_symbol)
-        if ok and vt_symbol in self.subscribed_symbols:
-            self.subscribed_symbols.remove(vt_symbol)
-        return ok
-
-    def _reconcile_subscriptions(self, trigger: str) -> None:
-        """重算并同步订阅列表"""
-        if not self.subscription_engine or not self.market_gateway:
-            return
-        if not self._should_trigger_subscription(trigger):
-            return
-
-        all_contracts = self.market_gateway.get_all_contracts()
-        if not all_contracts:
-            return
-
-        valid_symbols = {
-            str(getattr(c, "vt_symbol", "") or "")
-            for c in all_contracts
-            if str(getattr(c, "vt_symbol", "") or "")
-        }
-
-        now_dt = datetime.now()
-        now_ts = time.time()
-        signal_symbols = self._collect_active_signal_symbols(now_ts)
-
-        context = SubscriptionRuntimeContext(
-            now=now_dt,
-            all_contracts=all_contracts,
-            configured_products=self.target_products,
-            configured_contracts=sorted(self.base_configured_vt_symbols),
-            active_contracts_by_product=self._get_active_contract_map(),
-            position_symbols=self._collect_position_symbols(),
-            pending_order_symbols=self._collect_pending_order_symbols(),
-            signal_symbols=signal_symbols,
-            existing_subscriptions=set(self.subscribed_symbols),
-            get_tick=lambda symbol: self.market_gateway.get_tick(symbol),
-            get_last_price=self._get_last_price,
-        )
-        decision = self.subscription_engine.resolve(context)
-        if not decision.enabled:
-            return
-
-        target_symbols = {s for s in decision.target_symbols if s in valid_symbols}
-
-        dry_run = bool(self.subscription_config.get("dry_run", False))
-        auto_unsubscribe = bool(self.subscription_config.get("auto_unsubscribe", True))
-        stale_ttl_sec = max(0, int(self.subscription_config.get("stale_ttl_sec", 300) or 300))
-        detail_log = bool(self.subscription_config.get("log_decision_detail", True))
-
-        to_subscribe = sorted(target_symbols - self.subscribed_symbols)
-        for symbol in to_subscribe:
-            if dry_run:
-                continue
-            self._subscribe_symbol(symbol)
-
-        for symbol in target_symbols:
-            self._stale_unsubscribe_since.pop(symbol, None)
-
-        stale_candidates = sorted(self.subscribed_symbols - target_symbols)
-        for symbol in stale_candidates:
-            first_seen = self._stale_unsubscribe_since.setdefault(symbol, now_ts)
-            if not auto_unsubscribe:
-                continue
-            if stale_ttl_sec > 0 and (now_ts - first_seen) < stale_ttl_sec:
-                continue
-            if dry_run:
-                continue
-            if self._unsubscribe_symbol(symbol):
-                self._stale_unsubscribe_since.pop(symbol, None)
-
-        for symbol in list(self._stale_unsubscribe_since.keys()):
-            if symbol not in self.subscribed_symbols:
-                self._stale_unsubscribe_since.pop(symbol, None)
-
-        if detail_log:
-            self.logger.info(
-                f"订阅重算[{trigger}] modes={decision.effective_modes} "
-                f"target={len(target_symbols)} subscribed={len(self.subscribed_symbols)} "
-                f"add={len(to_subscribe)} remove_candidates={len(stale_candidates)}"
-            )
-            for warning in decision.warnings:
-                self.logger.warning(f"订阅模式告警: {warning}")
+        self.market_workflow.validate_universe()
 
     def _build_future_market_data(self, contracts: List[Any]) -> Dict[str, SelectionMarketData]:
-        """
-        从行情网关构建期货主力选择所需的 market_data。
-
-        仅纳入能获取到有效 volume/open_interest 的合约。
-        """
-        if not self.market_gateway:
-            return {}
-
-        data: Dict[str, SelectionMarketData] = {}
-        for contract in contracts:
-            vt_symbol = getattr(contract, "vt_symbol", "")
-            if not vt_symbol:
-                continue
-
-            tick = self.market_gateway.get_tick(vt_symbol)
-            if tick is None:
-                continue
-
-            try:
-                volume = float(getattr(tick, "volume", 0) or 0)
-                open_interest = float(getattr(tick, "open_interest", 0) or 0)
-            except (TypeError, ValueError):
-                continue
-
-            if volume != volume or open_interest != open_interest:
-                continue
-
-            data[vt_symbol] = SelectionMarketData(
-                vt_symbol=vt_symbol,
-                volume=int(volume),
-                open_interest=open_interest,
-            )
-
-        return data
+        return self.market_workflow.build_future_market_data(contracts)
 
     # ═══════════════════════════════════════════════════════════════════
-    #  执行服务联动参考（默认注释，不启用）
+    #  订阅管理委托
     # ═══════════════════════════════════════════════════════════════════
-    #
-    # def _dispatch_pending_advanced_children(self, current_time: datetime) -> None:
-    #     """
-    #     参考实现：调度高级订单待发子单并下发到执行网关。
-    #
-    #     使用方式：
-    #     1) 在信号触发处通过 self.advanced_order_scheduler.submit_xxx(...) 创建父单；
-    #     2) 在 on_bars 定时调用本方法；
-    #     3) 维护 child_id <-> vt_orderid 映射，供 on_trade/on_order 回补状态。
-    #     """
-    #     if (
-    #         not self.advanced_order_scheduler
-    #         or not self.smart_order_executor
-    #         or not self.exec_gateway
-    #         or not self.market_gateway
-    #     ):
-    #         return
-    #
-    #     pending_children = self.advanced_order_scheduler.get_pending_children(current_time)
-    #     for child in pending_children:
-    #         parent_order = self.advanced_order_scheduler.get_order(child.parent_id)
-    #         if not parent_order:
-    #             continue
-    #
-    #         origin = parent_order.request.instruction
-    #         bid_price, ask_price, price_tick = self._extract_best_quote(origin.vt_symbol)
-    #
-    #         child_instruction = OrderInstruction(
-    #             vt_symbol=origin.vt_symbol,
-    #             direction=origin.direction,
-    #             offset=origin.offset,
-    #             volume=child.volume,
-    #             price=origin.price + child.price_offset,
-    #             signal=origin.signal,
-    #             order_type=origin.order_type,
-    #         )
-    #         adaptive_price = self.smart_order_executor.calculate_adaptive_price(
-    #             child_instruction, bid_price, ask_price, price_tick
-    #         )
-    #         final_price = self.smart_order_executor.round_price_to_tick(adaptive_price, price_tick)
-    #
-    #         final_instruction = OrderInstruction(
-    #             vt_symbol=origin.vt_symbol,
-    #             direction=origin.direction,
-    #             offset=origin.offset,
-    #             volume=child.volume,
-    #             price=final_price,
-    #             signal=origin.signal,
-    #             order_type=origin.order_type,
-    #         )
-    #         vt_orderids = self.exec_gateway.send_order(final_instruction)
-    #         if not vt_orderids:
-    #             self.logger.warning(f"子单下发失败: child_id={child.child_id}")
-    #             continue
-    #
-    #         child.is_submitted = True
-    #         for vt_orderid in vt_orderids:
-    #             self.smart_order_executor.register_order(vt_orderid, final_instruction)
-    #             self._child_to_vt_orderid[child.child_id] = vt_orderid
-    #             self._vt_orderid_to_child[vt_orderid] = child.child_id
-    #             self._child_to_parent_order[child.child_id] = child.parent_id
-    #
-    # def _check_execution_timeouts_and_retry(self, current_time: datetime) -> None:
-    #     """
-    #     参考实现：执行超时检查并按 SmartOrderExecutor 策略重试。
-    #     """
-    #     if not self.smart_order_executor or not self.exec_gateway:
-    #         return
-    #
-    #     cancel_ids, timeout_events = self.smart_order_executor.check_timeouts(current_time)
-    #     for evt in timeout_events:
-    #         self.logger.warning(f"执行超时事件: {evt}")
-    #
-    #     for vt_orderid in cancel_ids:
-    #         self.exec_gateway.cancel_order(vt_orderid)
-    #         managed_order = self.smart_order_executor.get_managed_order(vt_orderid)
-    #         if managed_order is None:
-    #             continue
-    #
-    #         retry_instruction, retry_events = self.smart_order_executor.prepare_retry(
-    #             managed_order, price_tick=self.smart_order_executor.config.price_tick
-    #         )
-    #         for evt in retry_events:
-    #             self.logger.warning(f"执行重试事件: {evt}")
-    #
-    #         if retry_instruction is None:
-    #             self.smart_order_executor.mark_order_cancelled(vt_orderid)
-    #             child_id = self._vt_orderid_to_child.pop(vt_orderid, None)
-    #             if child_id:
-    #                 self._child_to_vt_orderid.pop(child_id, None)
-    #                 self._child_to_parent_order.pop(child_id, None)
-    #             continue
-    #
-    #         retry_ids = self.exec_gateway.send_order(retry_instruction)
-    #         if not retry_ids:
-    #             self.logger.warning(f"重试下单失败: old_vt_orderid={vt_orderid}")
-    #             continue
-    #
-    #         child_id = self._vt_orderid_to_child.pop(vt_orderid, None)
-    #         for new_vt_orderid in retry_ids:
-    #             self.smart_order_executor.register_order(new_vt_orderid, retry_instruction)
-    #             if child_id:
-    #                 self._child_to_vt_orderid[child_id] = new_vt_orderid
-    #                 self._vt_orderid_to_child[new_vt_orderid] = child_id
-    #
-    # def _extract_best_quote(self, vt_symbol: str) -> tuple[float, float, float]:
-    #     """
-    #     参考实现：从行情网关取最优买卖价与价格跳动。
-    #     无有效行情时回退到 last_price 和默认 price_tick。
-    #     """
-    #     bid_price = 0.0
-    #     ask_price = 0.0
-    #     price_tick = 0.2
-    #
-    #     if not self.market_gateway:
-    #         return bid_price, ask_price, price_tick
-    #
-    #     tick = self.market_gateway.get_tick(vt_symbol)
-    #     if tick is None:
-    #         return bid_price, ask_price, price_tick
-    #
-    #     bid_price = float(getattr(tick, "bid_price_1", 0.0) or 0.0)
-    #     ask_price = float(getattr(tick, "ask_price_1", 0.0) or 0.0)
-    #     price_tick = float(getattr(tick, "pricetick", 0.0) or 0.0) or price_tick
-    #
-    #     if bid_price <= 0:
-    #         bid_price = float(getattr(tick, "last_price", 0.0) or 0.0)
-    #     if ask_price <= 0:
-    #         ask_price = float(getattr(tick, "last_price", 0.0) or 0.0)
-    #     return bid_price, ask_price, price_tick
+
+    def _init_subscription_management(self) -> None:
+        self.subscription_workflow.init_subscription_management()
+
+    def _should_trigger_subscription(self, trigger: str) -> bool:
+        return self.subscription_workflow.should_trigger_subscription(trigger)
+
+    def _register_signal_temporary_symbol(self, vt_symbol: str) -> None:
+        self.subscription_workflow.register_signal_temporary_symbol(vt_symbol)
+
+    def _collect_active_signal_symbols(self, now_ts: float) -> Set[str]:
+        return self.subscription_workflow.collect_active_signal_symbols(now_ts)
+
+    def _collect_position_symbols(self) -> Set[str]:
+        return self.subscription_workflow.collect_position_symbols()
+
+    def _collect_pending_order_symbols(self) -> Set[str]:
+        return self.subscription_workflow.collect_pending_order_symbols()
+
+    def _get_active_contract_map(self) -> Dict[str, str]:
+        return self.subscription_workflow.get_active_contract_map()
+
+    def _get_last_price(self, vt_symbol: str) -> float:
+        return self.subscription_workflow.get_last_price(vt_symbol)
+
+    def _subscribe_symbol(self, vt_symbol: str) -> bool:
+        return self.subscription_workflow.subscribe_symbol(vt_symbol)
+
+    def _unsubscribe_symbol(self, vt_symbol: str) -> bool:
+        return self.subscription_workflow.unsubscribe_symbol(vt_symbol)
+
+    def _reconcile_subscriptions(self, trigger: str) -> None:
+        self.subscription_workflow.reconcile_subscriptions(trigger)
 
     # ═══════════════════════════════════════════════════════════════════
-    #  状态持久化
+    #  状态持久化委托
     # ═══════════════════════════════════════════════════════════════════
 
     def _create_snapshot(self) -> Dict[str, Any]:
-        """创建聚合根快照"""
-        snapshot = {
-            "target_aggregate": self.target_aggregate.to_snapshot(),
-            "position_aggregate": self.position_aggregate.to_snapshot(),
-            "current_dt": self.current_dt,
-        }
-        if self.combination_aggregate:
-            snapshot["combination_aggregate"] = self.combination_aggregate.to_snapshot()
-        return snapshot
-
-    # ═══════════════════════════════════════════════════════════════════
-    #  监控与事件
-    # ═══════════════════════════════════════════════════════════════════
+        return self.state_workflow.create_snapshot()
 
     def _record_snapshot(self) -> None:
-        """记录状态快照"""
-        if not self.monitor or not self.target_aggregate:
-            return
-        try:
-            self.monitor.record_snapshot(
-                self.target_aggregate,
-                self.position_aggregate,
-                self
-            )
-        except Exception as e:
-            self.logger.error(f"记录快照失败: {e}")
+        self.state_workflow.record_snapshot()
+
+    # ═══════════════════════════════════════════════════════════════════
+    #  事件桥接委托
+    # ═══════════════════════════════════════════════════════════════════
 
     def _publish_domain_events(self) -> None:
-        """发布领域事件"""
-        if not self.position_aggregate:
-            return
-
-        events = self.position_aggregate.pop_domain_events()
-        if not events:
-            return
-
-        event_engine = None
-        if hasattr(self, "strategy_engine") and hasattr(self.strategy_engine, "event_engine"):
-            event_engine = self.strategy_engine.event_engine
-
-        for domain_event in events:
-            # 日志记录
-            self.logger.info(f"领域事件: {domain_event.event_name} - {domain_event}")
-
-            # 通过领域事件驱动组合状态同步
-            if isinstance(domain_event, PositionClosedEvent):
-                self._sync_combination_status_on_position_closed(
-                    domain_event=domain_event,
-                    event_engine=event_engine,
-                )
-
-            # 发布到 EventEngine (飞书等订阅者会收到)
-            if event_engine:
-                if isinstance(domain_event, (ManualCloseDetectedEvent, ManualOpenDetectedEvent)):
-                    alert_type = "manual_close" if isinstance(domain_event, ManualCloseDetectedEvent) else "manual_open"
-                    alert_data = StrategyAlertData.from_domain_event(
-                        event=domain_event,
-                        strategy_name=self.strategy_name,
-                        alert_type=alert_type,
-                        message=f"{domain_event.event_name}: {domain_event.vt_symbol} x{domain_event.volume}"
-                    )
-                    vnpy_event = Event(type=EVENT_STRATEGY_ALERT, data=alert_data)
-                    event_engine.put(vnpy_event)
-
-                elif isinstance(domain_event, RiskLimitExceededEvent):
-                    alert_data = StrategyAlertData.from_domain_event(
-                        event=domain_event,
-                        strategy_name=self.strategy_name,
-                        alert_type="risk_limit",
-                        message=f"风控限额超标: {domain_event.limit_type} {domain_event.current_volume}/{domain_event.limit_volume}"
-                    )
-                    vnpy_event = Event(type=EVENT_STRATEGY_ALERT, data=alert_data)
-                    event_engine.put(vnpy_event)
+        self.event_bridge.publish_domain_events()
 
     def _sync_combination_status_on_position_closed(
         self,
         domain_event: PositionClosedEvent,
         event_engine: Optional[Any],
     ) -> None:
-        """同步组合状态"""
-        if not self.position_aggregate or not self.combination_aggregate:
-            return
-
-        closed_vt_symbols = self.position_aggregate.get_closed_vt_symbols()
-        self.combination_aggregate.sync_combination_status(
-            vt_symbol=domain_event.vt_symbol,
-            closed_vt_symbols=closed_vt_symbols,
-        )
-
-        combination_events = self.combination_aggregate.pop_domain_events()
-        for combination_event in combination_events:
-            self.logger.info(
-                f"组合领域事件: {combination_event.event_name} - {combination_event}"
-            )
-            if event_engine and isinstance(
-                combination_event, CombinationStatusChangedEvent
-            ):
-                alert_data = StrategyAlertData(
-                    strategy_name=self.strategy_name,
-                    alert_type="combination_status",
-                    message=(
-                        f"组合状态变更: {combination_event.combination_id} "
-                        f"{combination_event.old_status} -> {combination_event.new_status}"
-                    ),
-                    timestamp=combination_event.timestamp,
-                    extra={
-                        "combination_id": combination_event.combination_id,
-                        "combination_type": combination_event.combination_type,
-                        "old_status": combination_event.old_status,
-                        "new_status": combination_event.new_status,
-                    },
-                )
-                vnpy_event = Event(type=EVENT_STRATEGY_ALERT, data=alert_data)
-                event_engine.put(vnpy_event)
+        self.event_bridge.sync_combination_status_on_position_closed(domain_event, event_engine)
