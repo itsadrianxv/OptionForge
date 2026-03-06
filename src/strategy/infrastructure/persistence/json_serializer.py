@@ -135,7 +135,11 @@ def _resolve_dataclass(obj: Dict[str, Any]) -> Any:
 class JsonSerializer:
     """JSON 序列化器，支持 DataFrame 和 datetime 等特殊类型。"""
 
-    def serialize(self, data: Dict[str, Any]) -> str:
+    def serialize(
+        self,
+        data: Dict[str, Any],
+        inject_schema_version: bool = True,
+    ) -> str:
         """序列化为 JSON 字符串。
 
         - 自动注入 schema_version
@@ -145,7 +149,11 @@ class JsonSerializer:
         - Enum → value
         - dataclass → dict
         """
-        payload = {"schema_version": CURRENT_SCHEMA_VERSION, **data}
+        payload = (
+            {"schema_version": CURRENT_SCHEMA_VERSION, **data}
+            if inject_schema_version
+            else data
+        )
         return json.dumps(payload, cls=_CustomEncoder, ensure_ascii=False, sort_keys=True)
 
     def deserialize(self, json_str: str) -> Dict[str, Any]:

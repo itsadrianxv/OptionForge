@@ -1,4 +1,3 @@
-import json
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -7,6 +6,7 @@ from peewee import PostgresqlDatabase
 
 from ...domain.aggregate.instrument_manager import InstrumentManager
 from ...domain.aggregate.position_aggregate import PositionAggregate
+from ..persistence.json_serializer import JsonSerializer
 from src.strategy.infrastructure.monitoring.model.monitor_signal_event_po import (
     MonitorSignalEventPO,
 )
@@ -47,6 +47,14 @@ class StrategyMonitor:
         self._monitor_tables_ensured = False
         self._monitor_db: Optional[PostgresqlDatabase] = None
         self._last_status_map: Dict[str, Dict[str, bool]] = {}
+        self._json_serializer = JsonSerializer()
+
+    def _serialize_payload(self, payload: Dict[str, Any]) -> str:
+        """将监控 payload 序列化为 JSON 文本（不注入 schema_version）。"""
+        return self._json_serializer.serialize(
+            payload,
+            inject_schema_version=False,
+        )
 
     def _monitor_db_available(self) -> bool:
         if not self.monitor_db_enabled:
@@ -106,7 +114,7 @@ class StrategyMonitor:
 
         now_dt = datetime.now()
         try:
-            payload_text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            payload_text = self._serialize_payload(payload)
         except Exception:
             return
 
@@ -159,7 +167,7 @@ class StrategyMonitor:
             created_at = datetime.now()
 
         try:
-            payload_text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            payload_text = self._serialize_payload(payload)
         except Exception:
             return
 

@@ -290,6 +290,18 @@ class TestJsonSerializerUnit:
         parsed = json.loads(json_str)
         assert parsed["schema_version"] == CURRENT_SCHEMA_VERSION
 
+    def test_schema_version_can_be_disabled(self):
+        """serialize(..., inject_schema_version=False) should skip schema_version."""
+        serializer = _make_serializer()
+        json_str = serializer.serialize(
+            {"key": "value"},
+            inject_schema_version=False,
+        )
+        import json
+        parsed = json.loads(json_str)
+        assert "schema_version" not in parsed
+        assert parsed["key"] == "value"
+
     def test_complex_nested_structure(self):
         """Complex nested structure with mixed types should round-trip."""
         serializer = _make_serializer()
