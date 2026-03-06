@@ -42,27 +42,36 @@ tests/                       自动化测试
 doc/                         设计与操作文档
 ```
 
-## 快速启动
+## 快速启动（Docker 部署）
 
-1. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-2. 启动策略（单进程）
+1. 复制部署环境变量模板并按需修改（数据库账号、`APP_CONFIG_PATH`、`APP_EXTRA_ARGS`）：
 
 ```bash
-python -m src.main.main --mode standalone --config config/strategy_config.toml
+cp deploy/.env.example deploy/.env
 ```
 
-3. 可选：覆盖周期配置（如 15m）
+2. 使用 `deploy/` 下编排文件启动服务（会构建 `runner` 与 `monitor` 镜像）：
 
 ```bash
-python -m src.main.main --mode standalone --config config/strategy_config.toml --override-config config/timeframe/15m.toml
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
 ```
 
-## 在 `config` 目录下配置策略（简短指引）
+3. 检查服务状态与策略日志：
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml ps
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml logs -f runner
+```
+
+4. 默认监控页面地址：`http://localhost:5007`
+
+5. 停止服务：
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml down
+```
+
+## 在 `config` 目录下配置策略
 
 先在 `config/general/trading_target.toml` 定义交易标的，再在 `config/strategy_config.toml` 填写策略类和核心参数（仓位、档位、K 线窗口）。  
 然后按需调整 `config/domain_service/` 下的 `selection/risk/execution/pricing` 配置；如果启用动态订阅，再配置 `config/subscription/subscription.toml`。  
