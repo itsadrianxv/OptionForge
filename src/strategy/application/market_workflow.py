@@ -1,4 +1,4 @@
-"""Market data orchestration workflow for StrategyEntry."""
+"""策略入口的行情编排工作流。"""
 
 from __future__ import annotations
 
@@ -16,18 +16,18 @@ if TYPE_CHECKING:
 
 
 class MarketWorkflow:
-    """Coordinate market callbacks and strategy bar processing."""
+    """协调行情回调与 K 线处理流程。"""
 
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
     def on_tick(self, tick: TickData) -> None:
-        """Handle tick push by forwarding to bar pipeline when enabled."""
+        """处理逐笔行情推送，启用管道时转发给 K 线管道。"""
         if self.entry.bar_pipeline:
             self.entry.bar_pipeline.handle_tick(tick)
 
     def on_bars(self, bars: Dict[str, BarData]) -> None:
-        """Main bars callback with rollover checks and processing pipeline."""
+        """处理 K 线回调，包含换月检查与主流程分发。"""
         self.entry.last_bars.update(bars)
 
         if self.entry.target_aggregate and not self.entry.warming_up:
@@ -101,7 +101,7 @@ class MarketWorkflow:
                 self.entry._reconcile_subscriptions("timer")
 
     def process_bars(self, bars: Dict[str, BarData]) -> None:
-        """Process bar updates and orchestrate signal checks."""
+        """处理 K 线更新并编排信号检查流程。"""
         if not self.entry.target_aggregate:
             return
 
@@ -133,7 +133,7 @@ class MarketWorkflow:
                     if open_signal:
                         self.entry.logger.info(f"检测到开仓信号 [{vt_symbol}]: {open_signal}")
                         self.entry._register_signal_temporary_symbol(vt_symbol)
-                        # TODO: 实现完整开仓逻辑
+                        # 待实现: 完整开仓逻辑
                         # 1. 调用 OptionSelectorService 选择期权合约
                         # 2. 调用 PositionSizingService 计算仓位
                         # 3. 调用 VnpyTradeExecutionGateway 下单
@@ -153,7 +153,7 @@ class MarketWorkflow:
                             self.entry.logger.info(
                                 f"检测到平仓信号 [{position.vt_symbol}]: {close_signal}"
                             )
-                            # TODO: 实现完整平仓逻辑
+                            # 待实现: 完整平仓逻辑
                             # 1. 调用 PositionSizingService 计算平仓量
                             # 2. 调用 VnpyTradeExecutionGateway 下单
                             self.entry.logger.info(f"执行平仓: {position.vt_symbol}, 信号: {close_signal}")
@@ -167,7 +167,7 @@ class MarketWorkflow:
         self.entry._record_snapshot()
 
     def validate_universe(self) -> None:
-        """Ensure each configured product has an active dominant contract."""
+        """确保每个配置品种都有可用主力合约。"""
         if not self.entry.target_aggregate or not self.entry.market_gateway:
             return
 
@@ -200,7 +200,7 @@ class MarketWorkflow:
                 self.entry.logger.error(f"品种 {product} 主力合约初始化失败: {e}")
 
     def build_future_market_data(self, contracts: List[Any]) -> Dict[str, SelectionMarketData]:
-        """Build market_data required by FutureSelectionService from gateway ticks."""
+        """基于行情网关逐笔数据构建主力选择所需行情映射。"""
         if not self.entry.market_gateway:
             return {}
 

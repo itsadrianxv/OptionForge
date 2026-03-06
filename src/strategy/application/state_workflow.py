@@ -1,4 +1,4 @@
-"""State persistence and monitoring workflow for StrategyEntry."""
+"""策略入口的状态持久化与监控工作流。"""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ if TYPE_CHECKING:
 
 
 class StateWorkflow:
-    """Handle state snapshot and monitoring side effects."""
+    """处理状态快照与监控记录。"""
 
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
     def create_snapshot(self) -> Dict[str, Any]:
-        """Create aggregate snapshots for persistence."""
+        """创建用于持久化的聚合快照。"""
         snapshot = {
             "target_aggregate": self.entry.target_aggregate.to_snapshot(),
             "position_aggregate": self.entry.position_aggregate.to_snapshot(),
@@ -26,7 +26,7 @@ class StateWorkflow:
         return snapshot
 
     def record_snapshot(self) -> None:
-        """Push runtime snapshot to monitoring store."""
+        """将运行时快照写入监控存储。"""
         if not self.entry.monitor or not self.entry.target_aggregate:
             return
         try:

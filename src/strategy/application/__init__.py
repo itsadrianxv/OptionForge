@@ -1,4 +1,4 @@
-"""Application workflows for StrategyEntry."""
+"""策略入口的应用层工作流切片。"""
 
 from .event_bridge import EventBridge
 from .lifecycle_workflow import LifecycleWorkflow

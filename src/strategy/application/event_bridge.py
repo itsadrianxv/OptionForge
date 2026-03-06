@@ -1,4 +1,4 @@
-"""Domain event bridge workflow for StrategyEntry."""
+"""策略入口的领域事件桥接工作流。"""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ if TYPE_CHECKING:
 
 
 class EventBridge:
-    """Bridge aggregate events to external VnPy event engine."""
+    """将聚合根事件桥接到外部 VnPy 事件引擎。"""
 
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
     def on_order(self, order: OrderData) -> None:
-        """Handle order push and update position aggregate."""
+        """处理订单推送并更新持仓聚合根。"""
         if not self.entry.position_aggregate:
             return
         order_data = {
@@ -46,7 +46,7 @@ class EventBridge:
         self.entry._reconcile_subscriptions("on_order")
 
     def on_trade(self, trade: TradeData) -> None:
-        """Handle trade push and update position aggregate."""
+        """处理成交推送并更新持仓聚合根。"""
         if not self.entry.position_aggregate:
             return
         trade_data = {
@@ -64,11 +64,11 @@ class EventBridge:
         self.entry._reconcile_subscriptions("on_trade")
 
     def process_position_event(self, event: Event) -> None:
-        """Handle wrapped position event."""
+        """处理封装后的持仓事件。"""
         self.on_position(event.data)
 
     def on_position(self, position: PositionData) -> None:
-        """Handle position push and detect manual operations."""
+        """处理持仓推送并触发手动操作检测。"""
         if not self.entry.position_aggregate:
             return
         position_data = {
@@ -84,7 +84,7 @@ class EventBridge:
         self.entry._reconcile_subscriptions("on_position")
 
     def publish_domain_events(self) -> None:
-        """Pop aggregate events and publish alert events."""
+        """弹出领域事件并发布策略告警事件。"""
         if not self.entry.position_aggregate:
             return
 
@@ -107,7 +107,7 @@ class EventBridge:
                     event_engine=event_engine,
                 )
 
-            # 发布到 EventEngine (飞书等订阅者会收到)
+            # 发布到事件引擎（飞书等订阅者会收到）
             if event_engine:
                 if isinstance(domain_event, (ManualCloseDetectedEvent, ManualOpenDetectedEvent)):
                     alert_type = "manual_close" if isinstance(domain_event, ManualCloseDetectedEvent) else "manual_open"
@@ -135,7 +135,7 @@ class EventBridge:
         domain_event: PositionClosedEvent,
         event_engine: Optional[Any],
     ) -> None:
-        """Sync combination aggregate state when positions are closed."""
+        """在持仓平仓后同步组合聚合根状态。"""
         if not self.entry.position_aggregate or not self.entry.combination_aggregate:
             return
 

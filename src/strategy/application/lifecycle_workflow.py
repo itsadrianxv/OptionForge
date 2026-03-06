@@ -1,4 +1,4 @@
-"""Lifecycle orchestration workflow for StrategyEntry."""
+"""策略入口的生命周期编排工作流。"""
 
 from __future__ import annotations
 
@@ -40,13 +40,13 @@ if TYPE_CHECKING:
 
 
 class LifecycleWorkflow:
-    """Coordinate StrategyEntry lifecycle callbacks."""
+    """协调策略入口生命周期回调。"""
 
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
     def on_init(self) -> None:
-        """Initialize services, gateways, warmup, and alert handlers."""
+        """完成依赖初始化、预热与告警注册。"""
         self.entry.logger.info("策略初始化...")
 
         # ______________________________  1. 加载交易品种配置  ______________________________
@@ -62,7 +62,7 @@ class LifecycleWorkflow:
 
         project_root = Path(__file__).resolve().parents[3]
 
-        # ── 加载 strategy_config.toml ──
+        # ── 加载 `strategy_config.toml` ──
         try:
             strategy_config_path = str(project_root / "config" / "strategy_config.toml")
             full_config = ConfigLoader.load_toml(strategy_config_path)
@@ -83,7 +83,7 @@ class LifecycleWorkflow:
         self.entry.indicator_service = IndicatorService()
         self.entry.signal_service = SignalService()
 
-        # ── 从 TOML 配置 + YAML 覆盖加载领域服务配置 ──
+        # ── 从 TOML 配置与 YAML 覆盖加载领域服务配置 ──
         from src.main.config.domain_service_config_loader import (
             load_position_sizing_config,
             load_future_selector_config,
@@ -104,7 +104,7 @@ class LifecycleWorkflow:
             )
         )
 
-        # ── Greeks 风控 & 订单执行增强 ──
+        # ── 希腊值风控与订单执行增强 ──
 
         greeks_risk_cfg = full_config.get("greeks_risk", {})
         position_limits = greeks_risk_cfg.get("position_limits", {})
@@ -160,7 +160,7 @@ class LifecycleWorkflow:
             logger=self.entry.logger
         )
 
-        # 创建 JsonSerializer 实例，供 StateRepository 和 AutoSaveService 共享
+        # 创建 `JsonSerializer` 实例，供 `StateRepository` 与 `AutoSaveService` 共享
         self.entry.json_serializer = JsonSerializer()
 
         self.entry.state_repository = StateRepository(
@@ -169,7 +169,7 @@ class LifecycleWorkflow:
             logger=self.entry.logger,
         )
 
-        # AutoSaveService 仅在非回测模式下创建
+        # `AutoSaveService` 仅在非回测模式下创建
         if not self.entry.backtesting:
             self.entry.auto_save_service = AutoSaveService(
                 state_repository=self.entry.state_repository,
@@ -204,7 +204,7 @@ class LifecycleWorkflow:
         else:
             self.entry.logger.info("未配置K线合成，使用直通模式")
 
-        # ______________________________  6. warmup  ______________________________
+        # ______________________________  6. 预热  ______________________________
 
         original_trading = getattr(self.entry, "trading", True)
 
@@ -221,13 +221,13 @@ class LifecycleWorkflow:
                 setattr(self.entry, "trading", original_trading)
                 self.entry.warming_up = False
         else:
-            # 实盘 warmup: load_state + universe_validation + Postgres replay
+            # 实盘预热: 加载状态 + 标的补漏 + Postgres 回放
             try:
                 result = self.entry.state_repository.load(self.entry.strategy_name)
                 if isinstance(result, ArchiveNotFound):
                     self.entry.logger.info(f"首次启动，无历史状态: {self.entry.strategy_name}")
                 else:
-                    # Restore aggregates from snapshot
+                    # 从快照恢复聚合根
                     if "target_aggregate" in result:
                         self.entry.target_aggregate = InstrumentManager.from_snapshot(result["target_aggregate"])
                     if "position_aggregate" in result:
@@ -270,7 +270,7 @@ class LifecycleWorkflow:
                 )
                 if not ok:
                     self.entry.logger.error("实盘 warmup 失败: Postgres 中未能回放到有效 K 线")
-                    raise RuntimeError("live warmup failed")
+                    raise RuntimeError("实盘 warmup 失败")
             except Exception:
                 self.entry.logger.error("实盘 warmup 执行失败（可能是 BarPipeline 处理异常）", exc_info=True)
                 raise
@@ -295,7 +295,7 @@ class LifecycleWorkflow:
         self.entry.logger.info("策略初始化完成")
 
     def on_start(self) -> None:
-        """Run start hook and initialize subscriptions."""
+        """执行启动钩子并初始化订阅状态。"""
         try:
             StrategyTemplate.on_start(self.entry)
         except Exception:
@@ -305,7 +305,7 @@ class LifecycleWorkflow:
         self.entry._reconcile_subscriptions("on_init")
 
     def on_stop(self) -> None:
-        """Run stop hook, persist state, and cleanup handlers."""
+        """执行停止钩子、落盘状态并清理处理器。"""
         try:
             StrategyTemplate.on_stop(self.entry)
         except Exception:

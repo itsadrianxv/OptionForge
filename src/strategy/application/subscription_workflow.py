@@ -1,4 +1,4 @@
-"""Subscription management workflow for StrategyEntry."""
+"""策略入口的订阅管理工作流。"""
 
 from __future__ import annotations
 
@@ -16,13 +16,13 @@ if TYPE_CHECKING:
 
 
 class SubscriptionWorkflow:
-    """Own all subscription mode state transitions and reconciliation."""
+    """负责订阅模式的状态流转与订阅重算。"""
 
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
     def init_subscription_management(self) -> None:
-        """Initialize subscription engine state from config."""
+        """根据配置初始化订阅引擎状态。"""
         cfg = dict(self.entry.subscription_config or {})
         if not cfg:
             cfg = {"enabled": False}
@@ -45,7 +45,7 @@ class SubscriptionWorkflow:
             self.entry.logger.info("订阅模式引擎已禁用")
 
     def should_trigger_subscription(self, trigger: str) -> bool:
-        """Check whether current trigger should run reconciliation."""
+        """判断当前触发源是否需要执行订阅重算。"""
         if not self.entry.subscription_enabled:
             return False
         if not self.entry.subscription_trigger_events:
@@ -53,7 +53,7 @@ class SubscriptionWorkflow:
         return trigger in self.entry.subscription_trigger_events
 
     def register_signal_temporary_symbol(self, vt_symbol: str) -> None:
-        """Record temporary symbols raised by trading signals."""
+        """记录由交易信号触发的临时订阅合约。"""
         if not vt_symbol:
             return
         signal_cfg = self.entry.subscription_config.get("signal_driven_temporary", {}) if self.entry.subscription_config else {}
@@ -63,7 +63,7 @@ class SubscriptionWorkflow:
         self.entry._signal_temp_symbols[vt_symbol] = time.time() + ttl_sec
 
     def collect_active_signal_symbols(self, now_ts: float) -> Set[str]:
-        """Collect non-expired temporary signal symbols."""
+        """收集尚未过期的信号临时合约。"""
         active: Set[str] = set()
         for symbol, expiry_ts in list(self.entry._signal_temp_symbols.items()):
             if expiry_ts <= now_ts:
@@ -73,7 +73,7 @@ class SubscriptionWorkflow:
         return active
 
     def collect_position_symbols(self) -> Set[str]:
-        """Collect symbols that currently hold positions."""
+        """收集当前持仓涉及的合约。"""
         result: Set[str] = set()
 
         if self.entry.account_gateway:
@@ -98,7 +98,7 @@ class SubscriptionWorkflow:
         return result
 
     def collect_pending_order_symbols(self) -> Set[str]:
-        """Collect symbols that currently have active pending orders."""
+        """收集当前存在活动挂单的合约。"""
         result: Set[str] = set()
         if not self.entry.position_aggregate:
             return result
@@ -115,7 +115,7 @@ class SubscriptionWorkflow:
         return result
 
     def get_active_contract_map(self) -> Dict[str, str]:
-        """Map product code to active contract symbol."""
+        """获取品种代码到主力合约代码的映射。"""
         mapping: Dict[str, str] = {}
         if not self.entry.target_aggregate:
             return mapping
@@ -127,7 +127,7 @@ class SubscriptionWorkflow:
         return mapping
 
     def get_last_price(self, vt_symbol: str) -> float:
-        """Get latest last_price from market gateway."""
+        """从行情网关获取最新成交价。"""
         if not self.entry.market_gateway:
             return 0.0
         tick = self.entry.market_gateway.get_tick(vt_symbol)
@@ -139,7 +139,7 @@ class SubscriptionWorkflow:
             return 0.0
 
     def subscribe_symbol(self, vt_symbol: str) -> bool:
-        """Subscribe symbol and track it in runtime set."""
+        """订阅指定合约并写入运行时订阅集合。"""
         if not self.entry.market_gateway or not vt_symbol:
             return False
         ok = self.entry.market_gateway.subscribe(vt_symbol)
@@ -148,7 +148,7 @@ class SubscriptionWorkflow:
         return ok
 
     def unsubscribe_symbol(self, vt_symbol: str) -> bool:
-        """Unsubscribe symbol and remove it from runtime set."""
+        """取消订阅指定合约并从运行时集合移除。"""
         if not self.entry.market_gateway or not vt_symbol:
             return False
         ok = self.entry.market_gateway.unsubscribe(vt_symbol)
@@ -157,7 +157,7 @@ class SubscriptionWorkflow:
         return ok
 
     def reconcile_subscriptions(self, trigger: str) -> None:
-        """Resolve target subscription list and sync with gateway."""
+        """重算目标订阅列表并与网关状态同步。"""
         if not self.entry.subscription_engine or not self.entry.market_gateway:
             return
         if not self.should_trigger_subscription(trigger):
