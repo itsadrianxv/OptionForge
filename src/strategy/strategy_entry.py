@@ -476,7 +476,7 @@ class StrategyEntry(StrategyTemplate):
         self.logger.info("策略初始化完成")
 
     def on_start(self) -> None:
-        """策略启动回调"""
+        """策略启动时执行验证和订阅初始化"""
         try:
             super().on_start()
         except Exception:
@@ -486,7 +486,7 @@ class StrategyEntry(StrategyTemplate):
         self._reconcile_subscriptions("on_init")
 
     def on_stop(self) -> None:
-        """策略停止回调"""
+        """策略停止时保存状态并清理资源"""
         try:
             super().on_stop()
         except Exception:
@@ -514,7 +514,7 @@ class StrategyEntry(StrategyTemplate):
     # ═══════════════════════════════════════════════════════════════════
 
     def on_tick(self, tick: TickData) -> None:
-        """Tick 推送回调"""
+        """处理 Tick 数据推送"""
         if self.bar_pipeline:
             self.bar_pipeline.handle_tick(tick)
 
@@ -668,7 +668,7 @@ class StrategyEntry(StrategyTemplate):
         self._reconcile_subscriptions("on_trade")
 
     def process_position_event(self, event: Event) -> None:
-        """自定义的持仓事件处理函数"""
+        """处理持仓事件"""
         self.on_position(event.data)
 
     def on_position(self, position: PositionData) -> None:
@@ -813,6 +813,7 @@ class StrategyEntry(StrategyTemplate):
                 self.logger.error(f"品种 {product} 主力合约初始化失败: {e}")
 
     def _init_subscription_management(self) -> None:
+        """初始化订阅模式引擎配置"""
         cfg = dict(self.subscription_config or {})
         if not cfg:
             cfg = {"enabled": False}
@@ -835,6 +836,7 @@ class StrategyEntry(StrategyTemplate):
             self.logger.info("订阅模式引擎已禁用")
 
     def _should_trigger_subscription(self, trigger: str) -> bool:
+        """判断是否应触发订阅重算"""
         if not self.subscription_enabled:
             return False
         if not self.subscription_trigger_events:
@@ -842,6 +844,7 @@ class StrategyEntry(StrategyTemplate):
         return trigger in self.subscription_trigger_events
 
     def _register_signal_temporary_symbol(self, vt_symbol: str) -> None:
+        """注册信号驱动的临时订阅合约"""
         if not vt_symbol:
             return
         signal_cfg = self.subscription_config.get("signal_driven_temporary", {}) if self.subscription_config else {}
@@ -851,6 +854,7 @@ class StrategyEntry(StrategyTemplate):
         self._signal_temp_symbols[vt_symbol] = time.time() + ttl_sec
 
     def _collect_active_signal_symbols(self, now_ts: float) -> Set[str]:
+        """收集当前活跃的信号合约"""
         active: Set[str] = set()
         for symbol, expiry_ts in list(self._signal_temp_symbols.items()):
             if expiry_ts <= now_ts:
@@ -860,6 +864,7 @@ class StrategyEntry(StrategyTemplate):
         return active
 
     def _collect_position_symbols(self) -> Set[str]:
+        """收集当前持仓合约"""
         result: Set[str] = set()
 
         if self.account_gateway:
@@ -884,6 +889,7 @@ class StrategyEntry(StrategyTemplate):
         return result
 
     def _collect_pending_order_symbols(self) -> Set[str]:
+        """收集当前挂单合约"""
         result: Set[str] = set()
         if not self.position_aggregate:
             return result
@@ -900,6 +906,7 @@ class StrategyEntry(StrategyTemplate):
         return result
 
     def _get_active_contract_map(self) -> Dict[str, str]:
+        """获取品种到主力合约的映射"""
         mapping: Dict[str, str] = {}
         if not self.target_aggregate:
             return mapping
@@ -911,6 +918,7 @@ class StrategyEntry(StrategyTemplate):
         return mapping
 
     def _get_last_price(self, vt_symbol: str) -> float:
+        """获取合约最新价格"""
         if not self.market_gateway:
             return 0.0
         tick = self.market_gateway.get_tick(vt_symbol)
@@ -922,6 +930,7 @@ class StrategyEntry(StrategyTemplate):
             return 0.0
 
     def _subscribe_symbol(self, vt_symbol: str) -> bool:
+        """订阅合约行情"""
         if not self.market_gateway or not vt_symbol:
             return False
         ok = self.market_gateway.subscribe(vt_symbol)
@@ -930,6 +939,7 @@ class StrategyEntry(StrategyTemplate):
         return ok
 
     def _unsubscribe_symbol(self, vt_symbol: str) -> bool:
+        """取消订阅合约行情"""
         if not self.market_gateway or not vt_symbol:
             return False
         ok = self.market_gateway.unsubscribe(vt_symbol)
@@ -938,6 +948,7 @@ class StrategyEntry(StrategyTemplate):
         return ok
 
     def _reconcile_subscriptions(self, trigger: str) -> None:
+        """重算并同步订阅列表"""
         if not self.subscription_engine or not self.market_gateway:
             return
         if not self._should_trigger_subscription(trigger):
@@ -1190,7 +1201,7 @@ class StrategyEntry(StrategyTemplate):
     # ═══════════════════════════════════════════════════════════════════
 
     def _create_snapshot(self) -> Dict[str, Any]:
-        """创建聚合根快照用于持久化"""
+        """创建聚合根快照"""
         snapshot = {
             "target_aggregate": self.target_aggregate.to_snapshot(),
             "position_aggregate": self.position_aggregate.to_snapshot(),
@@ -1205,7 +1216,7 @@ class StrategyEntry(StrategyTemplate):
     # ═══════════════════════════════════════════════════════════════════
 
     def _record_snapshot(self) -> None:
-        """记录状态快照到监控系统"""
+        """记录状态快照"""
         if not self.monitor or not self.target_aggregate:
             return
         try:
@@ -1218,12 +1229,7 @@ class StrategyEntry(StrategyTemplate):
             self.logger.error(f"记录快照失败: {e}")
 
     def _publish_domain_events(self) -> None:
-        """
-        从 PositionAggregate 提取领域事件并发布到 VnPy EventEngine。
-
-        同时将 PositionClosedEvent 转换为 CombinationAggregate 的状态同步调用，
-        完成 Position -> Combination 的事件驱动联动。
-        """
+        """发布领域事件"""
         if not self.position_aggregate:
             return
 
@@ -1274,7 +1280,7 @@ class StrategyEntry(StrategyTemplate):
         domain_event: PositionClosedEvent,
         event_engine: Optional[Any],
     ) -> None:
-        """消费 PositionClosedEvent 并同步相关组合状态。"""
+        """同步组合状态"""
         if not self.position_aggregate or not self.combination_aggregate:
             return
 
