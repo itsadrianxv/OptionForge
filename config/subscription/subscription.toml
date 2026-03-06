@@ -31,10 +31,22 @@ dry_run = false
 # 是否记录模式决策细节日志
 log_decision_detail = true
 
+
+
+
+
+
+
 # 模式1：仅订阅显式配置的合约
 [configured_contracts_only]
 # 直接写 vt_symbol 列表；为空时可由策略上下文兜底
 vt_symbols = []
+
+
+
+
+
+
 
 # 模式2：按品种自动订阅主力期货及其期权
 [products_dominant_with_options]
@@ -47,12 +59,24 @@ band_n = 6
 # 到期策略：same_as_dominant=同主力月份；any=不过滤月份
 expiry_policy = "same_as_dominant"      # same_as_dominant | any
 
+
+
+
+
+
+
 # 模式3：仅订阅账户持仓相关合约
 [positions_only]
 # 是否同时订阅持仓期权对应的标的期货
 include_underlying = true
 # 是否把活动委托合约也纳入
 include_pending_orders = true
+
+
+
+
+
+
 
 # 模式4：在持仓基础上扩展虚/实 N 档
 [positions_with_wings]
@@ -63,14 +87,32 @@ wing_side = "both"                       # both | otm | itm
 # 是否同时包含 call/put；false 则只保留与持仓同方向
 include_call_put = true
 
+
+
+
+
+
+
 # 模式5：仅订阅主力期货（不扩期权）
 [dominant_only]
 products = []
+
+
+
+
+
+
 
 # 模式6：主力 + 近月 K 档期货
 [dominant_nearby_k]
 products = []
 nearby_k = 1
+
+
+
+
+
+
 
 # 模式7：按标的订阅 ATM 附近 N 档期权
 [atm_band]
@@ -79,11 +121,24 @@ underlyings_from = "dominant"            # dominant | positions | config
 band_n = 4
 include_call_put = true
 
+
+
+
+
+
+
+
 # 模式8：持仓对应到期月整条期权链
 [position_same_expiry_chain]
 # true=仅同到期月；false=可跨月
 same_expiry_only = true
 include_call_put = true
+
+
+
+
+
+
 
 # 模式9：按流动性保留 Top K 期权（过滤模式）
 [liquidity_top_k_options]
@@ -97,6 +152,12 @@ metric = "score"                         # volume | oi | score
 min_volume = 0
 min_oi = 0
 
+
+
+
+
+
+
 # 模式10：信号触发临时扩订阅（TTL 到期回收）
 [signal_driven_temporary]
 # 临时订阅存活时长（秒）
@@ -107,6 +168,12 @@ max_temp_symbols = 50
 include_underlying = true
 # 若信号在期货上，额外扩的期权 ATM 档位
 option_band_n = 2
+
+
+
+
+
+
 
 # 模式11：分时段切换模式组合
 [session_profile]
@@ -127,6 +194,12 @@ name = "regular"
 start = "09:10"
 end = "15:00"
 modes = ["products_dominant_with_options", "positions_only", "positions_with_wings"]
+
+
+
+
+
+
 
 # 模式12：强制包含/排除覆盖层（最高优先级之一）
 [include_exclude_overlay]
