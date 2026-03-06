@@ -199,7 +199,7 @@ class SubscriptionWorkflow:
         dry_run = bool(self.entry.subscription_config.get("dry_run", False))
         auto_unsubscribe = bool(self.entry.subscription_config.get("auto_unsubscribe", True))
         stale_ttl_sec = max(0, int(self.entry.subscription_config.get("stale_ttl_sec", 300) or 300))
-        detail_log = bool(self.entry.subscription_config.get("log_decision_detail", True))
+        detail_log = bool(self.entry.subscription_config.get("log_decision_detail", False))
 
         to_subscribe = sorted(target_symbols - self.entry.subscribed_symbols)
         for symbol in to_subscribe:
@@ -227,7 +227,7 @@ class SubscriptionWorkflow:
                 self.entry._stale_unsubscribe_since.pop(symbol, None)
 
         if detail_log:
-            self.entry.logger.info(
+            self.entry.logger.debug(
                 f"订阅重算[{trigger}] modes={decision.effective_modes} "
                 f"target={len(target_symbols)} subscribed={len(self.entry.subscribed_symbols)} "
                 f"add={len(to_subscribe)} remove_candidates={len(stale_candidates)}"

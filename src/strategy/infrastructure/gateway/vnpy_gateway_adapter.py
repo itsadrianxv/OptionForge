@@ -24,6 +24,6 @@ class VnpyGatewayAdapter:
 
     def _log(self, msg: str) -> None:
         if self.logger:
-            self.logger.info(f"[Gateway] {msg}")
+            self.logger.debug(f"[Gateway] {msg}")
         else:
             print(f"[Gateway] {msg}")

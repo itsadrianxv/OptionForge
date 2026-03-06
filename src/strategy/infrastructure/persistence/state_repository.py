@@ -84,7 +84,7 @@ class StateRepository:
 
         if self._logger:
             compression_info = " (已压缩)" if compressed else ""
-            self._logger.info(f"策略状态已保存: {strategy_name}{compression_info}")
+            self._logger.debug(f"策略状态已保存: {strategy_name}{compression_info}")
 
     def load(
         self, strategy_name: str
@@ -107,7 +107,7 @@ class StateRepository:
 
         if record is None:
             if self._logger:
-                self._logger.info(f"未找到策略状态记录: {strategy_name}")
+                self._logger.debug(f"未找到策略状态记录: {strategy_name}")
             return ArchiveNotFound(strategy_name=strategy_name)
 
         try:
@@ -119,7 +119,7 @@ class StateRepository:
             ) from e
 
         if self._logger:
-            self._logger.info(f"策略状态已加载: {strategy_name}")
+            self._logger.debug(f"策略状态已加载: {strategy_name}")
         return data
 
     def verify_integrity(self, strategy_name: str) -> bool:

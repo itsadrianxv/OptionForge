@@ -360,7 +360,7 @@ class StrategyMonitor:
             )
 
             if self.logger:
-                self.logger.info(
+                self.logger.debug(
                     f"监控快照已写入 Postgres: variant={self.variant_name}, instance={self.monitor_instance_id}"
                 )
 

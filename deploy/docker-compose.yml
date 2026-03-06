@@ -35,7 +35,7 @@ services:
       VNPY_DATABASE_DATABASE: ${POSTGRES_DB:-trading}
       MONITOR_USE_POSTGRES: ${MONITOR_USE_POSTGRES:-1}
     volumes:
-      - app_data:/app/data
+      - ${HOST_DATA_DIR:-../data}:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,6 +52,8 @@ services:
         python src/main/main.py
         --mode ${RUN_MODE:-daemon}
         --config ${APP_CONFIG_PATH:-config/strategy_config.toml}
+        --log-level ${APP_LOG_LEVEL:-INFO}
+        --log-dir ${APP_LOG_DIR:-data/logs}
         ${APP_EXTRA_ARGS:-}
     environment:
       VNPY_DATABASE_DRIVER: postgresql
@@ -64,7 +66,7 @@ services:
       DATA_RECORDER_SETTING_JSON: /app/data/runtime/data_recorder_setting.json
     volumes:
       - ../config:/app/config:ro
-      - app_data:/app/data
+      - ${HOST_DATA_DIR:-../data}:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,4 +74,3 @@ services:
 
 volumes:
   postgres_data:
-  app_data:

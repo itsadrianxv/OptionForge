@@ -142,7 +142,7 @@ class ChildProcess:
             all_contracts = self.main_engine.get_all_contracts()
             self.logger.info(f"MainEngine 获取到的合约总数: {len(all_contracts)}")
             if len(all_contracts) > 0:
-                self.logger.info(f"合约示例: {[c.vt_symbol for c in all_contracts]}")
+                self.logger.debug(f"合约示例: {[c.vt_symbol for c in all_contracts]}")
             else:
                 self.logger.warning("未能从 MainEngine 获取到任何合约信息！")
             

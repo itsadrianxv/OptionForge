@@ -29,7 +29,7 @@ auto_unsubscribe = true
 # 仅计算不执行订阅/退订
 dry_run = false
 # 是否记录模式决策细节日志
-log_decision_detail = true
+log_decision_detail = false
 
 
 

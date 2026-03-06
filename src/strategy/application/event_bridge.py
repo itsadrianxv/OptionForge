@@ -98,7 +98,7 @@ class EventBridge:
 
         for domain_event in events:
             # 日志记录
-            self.entry.logger.info(f"领域事件: {domain_event.event_name} - {domain_event}")
+            self.entry.logger.debug(f"领域事件: {domain_event.event_name} - {domain_event}")
 
             # 通过领域事件驱动组合状态同步
             if isinstance(domain_event, PositionClosedEvent):
@@ -147,7 +147,7 @@ class EventBridge:
 
         combination_events = self.entry.combination_aggregate.pop_domain_events()
         for combination_event in combination_events:
-            self.entry.logger.info(
+            self.entry.logger.debug(
                 f"组合领域事件: {combination_event.event_name} - {combination_event}"
             )
             if event_engine and isinstance(
