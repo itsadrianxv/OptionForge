@@ -1,0 +1,27 @@
+[strategy_contracts]
+indicator_service = "example.ema_cross_example.indicator_service:EmaCrossIndicatorService"
+signal_service = "example.ema_cross_example.signal_service:EmaCrossSignalService"
+
+[strategy_contracts.indicator_kwargs]
+fast_period = 8
+slow_period = 21
+
+[strategy_contracts.signal_kwargs]
+option_type = "call"
+strike_level = 1
+
+[service_activation]
+future_selection = true
+option_chain = true
+option_selector = true
+position_sizing = false
+pricing_engine = false
+greeks_calculator = false
+portfolio_risk = false
+smart_order_executor = false
+monitoring = true
+decision_observability = true
+
+[observability]
+decision_journal_maxlen = 200
+emit_noop_decisions = false

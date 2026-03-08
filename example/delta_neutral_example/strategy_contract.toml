@@ -1,0 +1,26 @@
+[strategy_contracts]
+indicator_service = "example.delta_neutral_example.indicator_service:DeltaNeutralIndicatorService"
+signal_service = "example.delta_neutral_example.signal_service:DeltaNeutralSignalService"
+
+[strategy_contracts.indicator_kwargs]
+rv_window = 20
+
+[strategy_contracts.signal_kwargs]
+open_spread_threshold = 0.05
+close_spread_threshold = 0.01
+
+[service_activation]
+future_selection = true
+option_chain = true
+option_selector = true
+position_sizing = false
+pricing_engine = false
+greeks_calculator = false
+portfolio_risk = false
+smart_order_executor = false
+monitoring = true
+decision_observability = true
+
+[observability]
+decision_journal_maxlen = 200
+emit_noop_decisions = false

@@ -1,0 +1,26 @@
+[strategy_contracts]
+indicator_service = "example.iv_rank_example.indicator_service:IvRankIndicatorService"
+signal_service = "example.iv_rank_example.signal_service:IvRankSignalService"
+
+[strategy_contracts.indicator_kwargs]
+lookback = 20
+
+[strategy_contracts.signal_kwargs]
+entry_rank = 0.7
+exit_rank = 0.4
+
+[service_activation]
+future_selection = true
+option_chain = true
+option_selector = true
+position_sizing = false
+pricing_engine = false
+greeks_calculator = false
+portfolio_risk = false
+smart_order_executor = false
+monitoring = true
+decision_observability = true
+
+[observability]
+decision_journal_maxlen = 200
+emit_noop_decisions = false
