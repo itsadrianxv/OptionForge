@@ -1,0 +1,53 @@
+name: 功能建议
+description: 提交一个新能力、流程优化或工程改进建议
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提出需求。请尽量讲清楚**使用场景、问题背景和验收标准**，这样更容易排优先级。
+
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景与痛点
+      description: 当前遇到了什么问题，为什么现状不够用？
+      placeholder: 例如当前回测 CLI 只能读取单一配置，批量参数扫描不方便
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望方案
+      description: 你希望系统新增或调整什么能力？
+      placeholder: 例如增加批量回测入口，支持参数网格与结果汇总导出
+    validations:
+      required: true
+
+  - type: textarea
+    id: value
+    attributes:
+      label: 业务价值
+      description: 这个改动能带来什么收益？
+      placeholder: 例如减少手工回测时间，提升策略迭代效率
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 请描述你认为完成后应满足的条件
+      placeholder: |
+        - 支持从命令行传入参数组合
+        - 输出每组参数的关键指标
+        - 失败任务不会中断全部回测
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 相关文档、样例、截图或替代方案

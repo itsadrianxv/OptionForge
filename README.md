@@ -14,8 +14,8 @@
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Architecture-DDD-0F766E?style=flat-square)
-![Tests](https://img.shields.io/badge/Tests-113%20pytest-10B981?style=flat-square&logo=pytest&logoColor=white)
-![Docker](https://img.shields.io/badge/Deploy-Docker%20Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
+[![CI](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/ci.yml)
+[![Docker Smoke](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/docker-smoke.yml/badge.svg?branch=main)](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/docker-smoke.yml)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-A42E2B?style=flat-square)
 ![GitHub stars](https://img.shields.io/github/stars/maroonxv/option-strategy-scaffold?style=flat-square)
 
@@ -237,4 +237,6 @@ python src/main/main.py --mode daemon --config config/strategy_config.toml
 
 </div>
 <!-- readme-gen:end:footer -->
+
+
 

@@ -1,0 +1,36 @@
+name: Docker Smoke
+
+on:
+  push:
+    paths:
+      - deploy/**
+      - requirements.txt
+      - .github/workflows/docker-smoke.yml
+  pull_request:
+    paths:
+      - deploy/**
+      - requirements.txt
+      - .github/workflows/docker-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: Compose config + image build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config
+
+      - name: Build application image
+        run: docker build -f deploy/Dockerfile -t option-strategy-scaffold:smoke .
