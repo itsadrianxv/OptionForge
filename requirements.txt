@@ -37,7 +37,7 @@ lxml==6.0.2
 MarkupSafe==3.0.3
 mini-racer==0.14.0
 multidict==6.7.1
-narwhals==2.15.0
+narwhals==2.17.0
 nbformat==5.10.4
 nest-asyncio==1.6.0
 numpy==2.4.1
