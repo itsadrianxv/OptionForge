@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0F172A,45:2563EB,100:16A34A&height=240&section=header&text=option-strategy-scaffold&fontSize=36&fontColor=ffffff&animation=fadeIn&desc=An%20option%20strategy%20scaffold%20built%20on%20vn.py&descAlignY=68&descSize=18" alt="option-strategy-scaffold" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0F172A,45:2563EB,100:16A34A&height=240&section=header&text=OptionForge&fontSize=36&fontColor=ffffff&animation=fadeIn&desc=An%20option%20strategy%20framework%20built%20on%20vn.py&descAlignY=68&descSize=18" alt="OptionForge" />
 
-<p><strong>An option strategy scaffold built for Coding Agents.</strong></p>
+<p><strong>OptionForge: an option strategy framework built for Coding Agents.</strong></p>
 <p>Built on <code>vn.py</code>, <code>PostgreSQL</code>, <code>Flask</code>, and <code>Docker</code>, it ships with domain modeling, runtime support, and deployment foundations, plus explicit Agent-facing context contracts, editable boundaries, and verification loops so you can iterate on option strategies through agentic coding.</p>
 <p><a href="./README.md">Chinese Version</a></p>
 
@@ -13,9 +13,9 @@
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Architecture-DDD-0F766E?style=flat-square)
 ![Workflow](https://img.shields.io/badge/Workflow-Agent--First-1D4ED8?style=flat-square)
-[![Docker Smoke](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/docker-smoke.yml/badge.svg?branch=main)](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/docker-smoke.yml)
+[![Docker Smoke](https://github.com/maroonxv/OptionForge/actions/workflows/docker-smoke.yml/badge.svg?branch=main)](https://github.com/maroonxv/OptionForge/actions/workflows/docker-smoke.yml)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-A42E2B?style=flat-square)
-![GitHub stars](https://img.shields.io/github/stars/maroonxv/option-strategy-scaffold?style=flat-square)
+![GitHub stars](https://img.shields.io/github/stars/maroonxv/OptionForge?style=flat-square)
 
 </div>
 
@@ -30,7 +30,7 @@
 
 ## Overview
 
-`option-strategy-scaffold` is a `vn.py`-based scaffold for option strategy development. Its goal is not to ship a ready-made profitable strategy, but to provide an engineering foundation with clear layers, configuration structure, runtime entrypoints, monitoring, and Agent-friendly collaboration assets.
+`OptionForge` is a `vn.py`-based framework for option strategy development. Its goal is not to ship a ready-made profitable strategy, but to provide an engineering foundation with clear layers, configuration structure, runtime entrypoints, monitoring, and Agent-friendly collaboration assets.
 
 You can focus on replacing or extending domain logic such as contract selection, signal generation, hedging, combination management, risk control, and execution without rebuilding the surrounding infrastructure from scratch.
 
@@ -40,7 +40,7 @@ The repository makes strategy intent, machine-readable context, editable surface
 
 This repository treats Coding Agents as a first-class collaborator: `forge` creates or refreshes collaboration assets, `strategy_spec.toml` captures strategy intent, and structured command output gives Agents stable data for validation and runtime evidence.
 
-From a source checkout, use `python -m src.cli.app ...`. If the package is installed into the active environment, the equivalent short alias is `option-scaffold ...`.
+From a source checkout, use `python -m src.cli.app ...`. If the package is installed into the active environment, the equivalent short alias is `optionforge ...`.
 
 Machine-readable AGENT assets:
 
@@ -405,7 +405,7 @@ python -m src.cli.app examples ema_cross_example
 ## Repository Layout
 
 ```text
-📦 option-strategy-scaffold
+📦 OptionForge
 ├─ pyproject.toml               Python package metadata and CLI entrypoint
 ├─ .focus/                      Current focus pointer and generated navigation assets
 ├─ config/                      Strategy, domain-service, subscription, logging, and timeframe config
@@ -431,7 +431,7 @@ python -m src.cli.app examples ema_cross_example
 - `doc/manual/cli-usage.md`: CLI usage guide
 - `doc/plan/2026-03-08-cli-productization-plan.md`: CLI productization plan
 - `doc/plan/2026-03-09-python-interactive-cli-wizard-plan.md`: interactive CLI wizard plan
-- `doc/slides/option-strategy-scaffold-internal-share.html`: internal project sharing deck
+- `doc/slides/OptionForge-internal-share.html`: internal project sharing deck
 - `.focus/SYSTEM_MAP.md`: current system map
 - `.focus/TASK_BRIEF.md`: current task brief
 - `.focus/TEST_MATRIX.md`: current focus test matrix

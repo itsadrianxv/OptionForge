@@ -13,7 +13,7 @@ python -m src.cli.app forge --json
 ```
 
 Run commands from the repository root when working from source.
-If the package is installed into the active environment, the equivalent short alias is `option-scaffold ...`.
+If the package is installed into the active environment, the equivalent short alias is `optionforge ...`.
 
 Use `forge` when you need to:
 

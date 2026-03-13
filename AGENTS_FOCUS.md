@@ -19,7 +19,7 @@ The goal is to keep all AGENT-facing guidance aligned around one workflow and on
 The default AGENT workflow is:
 
 From a source checkout, execute commands from the repository root with `python -m src.cli.app ...`.
-If the package is installed into the active environment, the equivalent short alias is `option-scaffold ...`.
+If the package is installed into the active environment, the equivalent short alias is `optionforge ...`.
 
 1. Run `python -m src.cli.app forge` when you need to create or refresh AGENT assets.
 2. Inspect `strategy_spec.toml` and `.focus/context.json`.

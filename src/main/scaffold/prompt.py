@@ -246,7 +246,7 @@ def should_prompt_for_create(options: CreateOptions) -> bool:
 
 def prompt_for_create_options(options: CreateOptions) -> CreateOptions:
     """收集 create 命令所需的交互式选择。"""
-    click.echo("欢迎使用 option-scaffold 项目创建向导。")
+    click.echo("欢迎使用 OptionForge 项目创建向导。")
     click.echo("接下来会依次确认项目名称、策略预设、模块定制、配置参数、目录处理方式与最终确认。")
     click.echo("带默认值的问题可直接回车接受默认配置。")
 

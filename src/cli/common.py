@@ -37,7 +37,7 @@ class CliEntryMetadata:
 
 DEFAULT_CLI_ENTRY_METADATA = CliEntryMetadata(
     primary="python -m src.cli.app",
-    installed_alias="option-scaffold",
+    installed_alias="optionforge",
     cwd="repo-root",
 )
 

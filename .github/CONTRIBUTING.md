@@ -36,7 +36,7 @@ Docker Compose 冒烟检查：
 
 ```powershell
 docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml config
-docker build -f deploy/Dockerfile -t option-strategy-scaffold:local .
+docker build -f deploy/Dockerfile -t optionforge:local .
 ```
 
 ## 提交规范

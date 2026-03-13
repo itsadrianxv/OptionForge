@@ -21,7 +21,7 @@
   ],
   "cli": {
     "primary": "python -m src.cli.app",
-    "installed_alias": "option-scaffold",
+    "installed_alias": "optionforge",
     "cwd": "repo-root"
   },
   "recommended_first_pass": {

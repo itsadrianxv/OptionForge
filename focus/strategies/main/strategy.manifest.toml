@@ -12,7 +12,7 @@ summary = "Agent-first strategy workspace for developing and iterating option st
 
 [cli]
 primary = "python -m src.cli.app"
-installed_alias = "option-scaffold"
+installed_alias = "optionforge"
 cwd = "repo-root"
 
 [entrypoints]

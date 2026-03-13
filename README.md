@@ -1,9 +1,9 @@
-﻿<!-- readme-gen:start:hero -->
+<!-- readme-gen:start:hero -->
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0F172A,45:2563EB,100:16A34A&height=240&section=header&text=option-strategy-scaffold&fontSize=36&fontColor=ffffff&animation=fadeIn&desc=%E5%9F%BA%E4%BA%8E%20vn.py%20%E7%9A%84%E6%9C%9F%E6%9D%83%E7%AD%96%E7%95%A5%E8%84%9A%E6%89%8B%E6%9E%B6&descAlignY=68&descSize=18" alt="option-strategy-scaffold" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0F172A,45:2563EB,100:16A34A&height=240&section=header&text=OptionForge&fontSize=36&fontColor=ffffff&animation=fadeIn&desc=%E5%9F%BA%E4%BA%8E%20vn.py%20%E7%9A%84%E6%9C%9F%E6%9D%83%E7%AD%96%E7%95%A5%E8%84%9A%E6%89%8B%E6%9E%B6&descAlignY=68&descSize=18" alt="OptionForge" />
 
-<p><strong>面向 Coding Agent 的期权交易策略研发脚手架。</strong></p>
+<p><strong>OptionForge：面向 Coding Agent 的期权交易策略研发脚手架。</strong></p>
 <p>基于 <code>vn.py</code>、<code>PostgreSQL</code>、<code>Flask</code> 与 <code>Docker</code> 预置领域建模、运行支撑与部署底座，并内建面向 Agent 的上下文协议、编辑边界与验证回路，让你更顺手地通过 agentic coding 持续迭代期权交易策略。</p>
 <p><a href="./README_EN.md">英文版</a></p>
 
@@ -16,9 +16,9 @@
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Architecture](https://img.shields.io/badge/Architecture-DDD-0F766E?style=flat-square)
 ![Workflow](https://img.shields.io/badge/Workflow-Agent--First-1D4ED8?style=flat-square)
-[![Docker Smoke](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/docker-smoke.yml/badge.svg?branch=main)](https://github.com/maroonxv/option-strategy-scaffold/actions/workflows/docker-smoke.yml)
+[![Docker Smoke](https://github.com/maroonxv/OptionForge/actions/workflows/docker-smoke.yml/badge.svg?branch=main)](https://github.com/maroonxv/OptionForge/actions/workflows/docker-smoke.yml)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-A42E2B?style=flat-square)
-![GitHub stars](https://img.shields.io/github/stars/maroonxv/option-strategy-scaffold?style=flat-square)
+![GitHub stars](https://img.shields.io/github/stars/maroonxv/OptionForge?style=flat-square)
 
 </div>
 <!-- readme-gen:end:badges -->
@@ -36,7 +36,7 @@
 
 ## 项目简介
 
-`option-strategy-scaffold` 是一个基于 `vn.py` 的期权策略脚手架，目标不是直接提供“现成盈利策略”，而是提供一套已经拆好层、配好配置、接好运行与监控入口，并对 Coding Agent 协作友好的工程底座。
+`OptionForge` 是一个基于 `vn.py` 的期权策略脚手架，目标不是直接提供“现成盈利策略”，而是提供一套已经拆好层、配好配置、接好运行与监控入口，并对 Coding Agent 协作友好的工程底座。
 
 你可以在现有骨架上聚焦改造领域服务，例如选合约、信号计算、对冲、组合管理、风控与执行逻辑，而不必从零重复搭建工程基础设施。
 
@@ -46,7 +46,7 @@
 
 这个仓库把 Coding Agent 视为一等公民：`forge` 用来生成或刷新协作资产，`strategy_spec.toml` 用来描述策略意图，结构化命令输出则负责把验证与运行结果稳定地交给 Agent 消费。
 
-从源码目录运行时，统一使用 `python -m src.cli.app ...`；如果已经安装到当前环境，也可以使用等价简写 `option-scaffold ...`。
+从源码目录运行时，统一使用 `python -m src.cli.app ...`；如果已经安装到当前环境，也可以使用等价简写 `optionforge ...`。
 
 
 机器可读的 AGENT 资产：
@@ -423,7 +423,7 @@ python -m src.cli.app examples ema_cross_example
 ## 仓库结构
 
 ```text
-📦 option-strategy-scaffold
+📦 OptionForge
 ├─ pyproject.toml               Python 包元数据与 CLI 入口
 ├─ .focus/                      当前焦点指针与生成出的导航资产
 ├─ config/                      策略、领域服务、订阅、日志与周期配置
@@ -451,7 +451,7 @@ python -m src.cli.app examples ema_cross_example
 - `doc/manual/cli-usage.md`：CLI 使用说明
 - `doc/plan/2026-03-08-cli-productization-plan.md`：CLI 产品化规划
 - `doc/plan/2026-03-09-python-interactive-cli-wizard-plan.md`：交互式 CLI 向导规划
-- `doc/slides/option-strategy-scaffold-internal-share.html`：项目内部分享材料
+- `doc/slides/OptionForge-internal-share.html`：项目内部分享材料
 - `.focus/SYSTEM_MAP.md`：当前系统地图
 - `.focus/TASK_BRIEF.md`：当前任务简报
 - `.focus/TEST_MATRIX.md`：当前焦点测试矩阵

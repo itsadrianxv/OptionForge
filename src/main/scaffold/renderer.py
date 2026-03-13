@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -226,7 +226,7 @@ def _render_project_pyproject(plan: ScaffoldPlan) -> str:
         ]
 
         [project.scripts]
-        option-scaffold = "src.cli.app:app"
+        optionforge = "src.cli.app:app"
 
         [tool.setuptools.dynamic]
         version = {{ attr = "src.__version__" }}

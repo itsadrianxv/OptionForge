@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>option-strategy-scaffold｜内部分享</title>
+    <title>OptionForge｜内部分享</title>
     <style>
         html,
         body {
@@ -864,13 +864,13 @@
         <section class="slide" id="slide-1" aria-label="封面">
             <div class="slide-shell">
                 <div class="slide-top">
-                    <div class="slide-label" data-reveal>option-strategy-scaffold · 内部分享</div>
+                    <div class="slide-label" data-reveal>OptionForge · 内部分享</div>
                     <div class="slide-index" data-reveal>01 / 12</div>
                 </div>
                 <div class="hero-grid">
                     <div class="hero-copy">
                         <h1 class="slide-title hero-title" data-reveal>把期权策略研发，做成可复用的工程底座</h1>
-                        <p class="hero-summary delay-1" data-reveal>`option-strategy-scaffold` 基于 `vn.py`，把运行、回测、配置、监控，以及 AI 导航统一到一条工程化工作流里。</p>
+                        <p class="hero-summary delay-1" data-reveal>`OptionForge` 基于 `vn.py`，把运行、回测、配置、监控，以及 AI 导航统一到一条工程化工作流里。</p>
                         <div class="stats-row delay-2" data-reveal>
                             <div class="metric-card">
                                 <div class="metric-number">10</div>
@@ -886,7 +886,7 @@
                             </div>
                             <div class="metric-card">
                                 <div class="metric-number">1</div>
-                                <div class="metric-label">统一入口：option-scaffold</div>
+                                <div class="metric-label">统一入口：optionforge</div>
                             </div>
                         </div>
                         <div class="hero-packs delay-3" data-reveal>
@@ -1187,7 +1187,7 @@
                             <div class="focus-step-number">1</div>
                             <div>
                                 <h3 class="focus-step-title">先看焦点</h3>
-                                <p class="focus-step-text">`option-scaffold focus show` 先给出当前策略、pack 链路和阅读顺序。</p>
+                                <p class="focus-step-text">`optionforge focus show` 先给出当前策略、pack 链路和阅读顺序。</p>
                             </div>
                         </div>
                         <div class="focus-step delay-1" data-reveal>
@@ -1215,7 +1215,7 @@
                             <div class="focus-step-number">5</div>
                             <div>
                                 <h3 class="focus-step-title">先跑焦点测试</h3>
-                                <p class="focus-step-text">`option-scaffold focus test` 避免整仓盲跑，让局部验证更高效。</p>
+                                <p class="focus-step-text">`optionforge focus test` 避免整仓盲跑，让局部验证更高效。</p>
                             </div>
                         </div>
                     </div>
@@ -1252,7 +1252,7 @@
                 <div class="slide-top">
                     <div>
                         <div class="slide-label" data-reveal>日常入口</div>
-                        <h2 class="slide-title delay-1" data-reveal>把常见动作收敛到一条命令面：`option-scaffold`</h2>
+                        <h2 class="slide-title delay-1" data-reveal>把常见动作收敛到一条命令面：`optionforge`</h2>
                     </div>
                     <div class="slide-index" data-reveal>07 / 12</div>
                 </div>
@@ -1262,12 +1262,12 @@
                             <div class="terminal-lights"><span></span><span></span><span></span></div>
                             <div class="slide-index">project shell</div>
                         </div>
-                        <pre>option-scaffold
-option-scaffold validate --config config/strategy_config.toml
-option-scaffold run --config config/strategy_config.toml --paper
-option-scaffold backtest --config config/strategy_config.toml --start 2025-01-01 --end 2025-03-01 --no-chart
-option-scaffold focus show
-option-scaffold focus test
+                        <pre>optionforge
+optionforge validate --config config/strategy_config.toml
+optionforge run --config config/strategy_config.toml --paper
+optionforge backtest --config config/strategy_config.toml --start 2025-01-01 --end 2025-03-01 --no-chart
+optionforge focus show
+optionforge focus test
 python -m src.cli.app --help</pre>
                     </div>
                     <div class="command-grid">
@@ -1294,7 +1294,7 @@ python -m src.cli.app --help</pre>
                     </div>
                 </div>
                 <div class="slide-footer">
-                    <span>开发态可走 `python -m src.cli.app`，安装态直接走 `option-scaffold`</span>
+                    <span>开发态可走 `python -m src.cli.app`，安装态直接走 `optionforge`</span>
                     <span>CLI 设计目标：入口统一，但业务逻辑仍落回具体模块</span>
                 </div>
             </div>
@@ -1379,25 +1379,25 @@ python -m src.cli.app --help</pre>
                         <div class="timeline-card delay-1" data-reveal>
                             <div class="timeline-index">01</div>
                             <h3 class="card-title">生成工作区</h3>
-                            <div class="command">option-scaffold create alpha_lab</div>
+                            <div class="command">optionforge create alpha_lab</div>
                             <p class="timeline-result">先展示这个项目不是只能服务当前仓库，而是能产出新的策略工作区。</p>
                         </div>
                         <div class="timeline-card delay-1" data-reveal>
                             <div class="timeline-index">02</div>
                             <h3 class="card-title">确认焦点</h3>
-                            <div class="command">option-scaffold focus show</div>
+                            <div class="command">optionforge focus show</div>
                             <p class="timeline-result">把当前策略、pack 链路和可编辑表面讲清楚，再进入代码。</p>
                         </div>
                         <div class="timeline-card delay-2" data-reveal>
                             <div class="timeline-index">03</div>
                             <h3 class="card-title">先做配置校验</h3>
-                            <div class="command">option-scaffold validate --config ...</div>
+                            <div class="command">optionforge validate --config ...</div>
                             <p class="timeline-result">强调工程化不是直接 run，而是先把配置和绑定关系跑通。</p>
                         </div>
                         <div class="timeline-card delay-2" data-reveal>
                             <div class="timeline-index">04</div>
                             <h3 class="card-title">启动 paper run</h3>
-                            <div class="command">option-scaffold run --config ... --paper</div>
+                            <div class="command">optionforge run --config ... --paper</div>
                             <p class="timeline-result">用模拟交易展示主链路，避免在分享里引入外部交易风险。</p>
                         </div>
                         <div class="timeline-card delay-3" data-reveal>
@@ -1540,7 +1540,7 @@ python -m src.cli.app --help</pre>
                 </div>
                 <div class="slide-footer">
                     <span>谢谢</span>
-                    <span>option-strategy-scaffold · internal deck</span>
+                    <span>OptionForge · internal deck</span>
                 </div>
             </div>
         </section>

@@ -6,7 +6,7 @@
 
 当前仓库已经具备以下基础能力：
 
-- `option-scaffold create` 已支持交互式向导与非交互 flags 双路径
+- `optionforge create` 已支持交互式向导与非交互 flags 双路径
 - 已有 preset、capability、option、依赖校验、互斥校验、自动修复预览
 - 已有目录冲突处理逻辑
 - 已有整仓库 scaffold 渲染与最小测试覆盖
@@ -36,7 +36,7 @@
 
 - 不自动执行 `python -m venv`
 - 不自动执行 `pip install`
-- 不自动执行 `option-scaffold validate`
+- 不自动执行 `optionforge validate`
 - 不自动执行 `git init`
 - 不把 `run` / `backtest` / `doctor` 改造成问答式流程
 - 不引入 Ink、Node 子项目、worktree 实验
@@ -60,7 +60,7 @@
 
 #### 目标
 
-让用户在交互终端中直接执行 `option-scaffold` 时，不再只看到 help，而是进入主菜单。
+让用户在交互终端中直接执行 `optionforge` 时，不再只看到 help，而是进入主菜单。
 
 #### 要求
 
@@ -90,9 +90,9 @@
 
 #### 验收标准
 
-- 在交互终端执行 `option-scaffold` 时出现主菜单
+- 在交互终端执行 `optionforge` 时出现主菜单
 - 直接回车默认进入创建路径
-- 非交互环境下执行 `option-scaffold` 不会卡在问答流程
+- 非交互环境下执行 `optionforge` 不会卡在问答流程
 - 现有 `--help`、`--version` 和显式子命令行为不受影响
 
 ---
@@ -122,7 +122,7 @@
 
 - 交互式 `create` 默认项目名显示为 `alpha_lab`
 - 默认 preset 仍是 `custom`
-- `option-scaffold create -y` 在未指定名称时使用 `alpha_lab`
+- `optionforge create -y` 在未指定名称时使用 `alpha_lab`
 - 所有相关测试同步更新
 
 ---
@@ -212,8 +212,8 @@
 
 - CLI 成功输出至少包含：
   - `cd <project>`
-  - `option-scaffold validate --config config/strategy_config.toml`
-  - 一个最小 `option-scaffold run` 示例
+  - `optionforge validate --config config/strategy_config.toml`
+  - 一个最小 `optionforge run` 示例
 - 生成出的 README / 工作区说明中，也保持一致的 next steps 风格
 - 仍然只输出建议，不自动执行
 
@@ -299,7 +299,7 @@ pytest -c config/pytest.ini tests/main/scaffold/test_prompt.py tests/main/scaffo
 
 当且仅当以下条件同时满足，才算本计划完成：
 
-- `option-scaffold` 无参数在交互终端进入主菜单
+- `optionforge` 无参数在交互终端进入主菜单
 - `create` 默认项目名为 `alpha_lab`
 - `create` 默认路径不会展开高级模块提问
 - 生成前存在最终确认页

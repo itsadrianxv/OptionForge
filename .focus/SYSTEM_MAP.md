@@ -20,7 +20,7 @@
 ## Runtime Chain
 
 1. Source-checkout default: `python -m src.cli.app`.
-2. Installed alias: `option-scaffold`.
+2. Installed alias: `optionforge`.
 3. Run CLI commands from `repo-root`.
 4. `src/cli/app.py` routes commands to `forge`, `focus`, `run`, `backtest`, `validate`, and supporting commands.
 5. `src/main/main.py` orchestrates runtime startup.

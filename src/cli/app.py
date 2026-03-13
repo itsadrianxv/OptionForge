@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 import sys
@@ -51,7 +51,7 @@ def _version_option_callback(ctx: click.Context, param: click.Parameter, value: 
     if not value or ctx.resilient_parsing:
         return
 
-    click.echo(f"option-scaffold {__version__}")
+    click.echo(f"OptionForge {__version__}")
     ctx.exit()
 
 
@@ -64,7 +64,7 @@ def _should_enter_main_menu(ctx: click.Context) -> bool:
 
 
 def _prompt_main_menu_choice() -> int:
-    click.echo("欢迎使用 option-scaffold。")
+    click.echo("欢迎使用 OptionForge。")
     click.echo("主菜单：")
     click.echo("1. 创建策略工作区")
     click.echo("2. 查看示例")
@@ -100,8 +100,8 @@ def _run_main_menu_action(choice: int) -> None:
 
 
 @click.group(
-    name="option-scaffold",
-    help="AI-first 期权策略脚手架统一命令入口，推荐先使用 focus 聚焦当前策略。",
+    name="optionforge",
+    help="OptionForge 的统一命令入口，推荐先使用 focus 聚焦当前策略。",
     invoke_without_command=True,
 )
 @click.option(
