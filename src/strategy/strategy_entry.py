@@ -42,6 +42,7 @@ from .domain.value_object.selection.selection import MarketData as SelectionMark
 from .domain.value_object.signal.strategy_contract import DecisionTrace
 from .infrastructure.gateway.vnpy_account_gateway import VnpyAccountGateway
 from .infrastructure.gateway.vnpy_market_data_gateway import VnpyMarketDataGateway
+from .infrastructure.gateway.vnpy_order_gateway import VnpyOrderGateway
 from .infrastructure.gateway.vnpy_trade_execution_gateway import VnpyTradeExecutionGateway
 from .infrastructure.logging.logging_utils import setup_strategy_logger
 from .infrastructure.monitoring.strategy_monitor import StrategyMonitor
@@ -141,6 +142,7 @@ class StrategyEntry(StrategyTemplate):
         # ── 基础设施网关 (在 on_init 中初始化) ──
         self.market_gateway: Optional[VnpyMarketDataGateway] = None
         self.account_gateway: Optional[VnpyAccountGateway] = None
+        self.order_gateway: Optional[VnpyOrderGateway] = None
         self.exec_gateway: Optional[VnpyTradeExecutionGateway] = None
 
         # ── 基础设施: 监控与持久化 (在 on_init 中初始化) ──

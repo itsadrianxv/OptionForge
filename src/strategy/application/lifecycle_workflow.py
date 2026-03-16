@@ -27,6 +27,7 @@ from ..domain.value_object.risk import RiskThresholds
 from ..infrastructure.bar_pipeline import BarPipeline
 from ..infrastructure.gateway.vnpy_account_gateway import VnpyAccountGateway
 from ..infrastructure.gateway.vnpy_market_data_gateway import VnpyMarketDataGateway
+from ..infrastructure.gateway.vnpy_order_gateway import VnpyOrderGateway
 from ..infrastructure.gateway.vnpy_trade_execution_gateway import VnpyTradeExecutionGateway
 from ..infrastructure.monitoring.strategy_monitor import StrategyMonitor
 from ..infrastructure.persistence.auto_save_service import AutoSaveService
@@ -198,6 +199,7 @@ class LifecycleWorkflow:
 
         self.entry.market_gateway = VnpyMarketDataGateway(self.entry)
         self.entry.account_gateway = VnpyAccountGateway(self.entry)
+        self.entry.order_gateway = VnpyOrderGateway(self.entry)
         self.entry.exec_gateway = VnpyTradeExecutionGateway(self.entry)
 
         variant_name = self.entry.strategy_name
@@ -302,6 +304,8 @@ class LifecycleWorkflow:
                 self.entry.logger.error(f"加载策略状态失败: {self.entry.strategy_name}", exc_info=True)
                 raise
 
+            self._sync_live_oms_snapshot()
+
             try:
                 self.entry._validate_universe()
             except Exception:
@@ -351,6 +355,30 @@ class LifecycleWorkflow:
                 self.entry.logger.info("飞书通知已启用")
 
         self.entry.logger.info("策略初始化完成")
+
+    def _sync_live_oms_snapshot(self) -> None:
+        """在启用交易前将券商侧 OMS 状态灌回聚合根。"""
+        positions = list(self.entry.account_gateway.get_all_positions() or [])
+        active_orders = list(self.entry.order_gateway.get_all_active_orders() or [])
+        trades = list(self.entry.order_gateway.get_all_trades() or [])
+
+        if not positions and not active_orders and not trades:
+            self.entry.logger.warning("实盘 OMS 回补为空，继续沿用持久化快照")
+            return
+
+        for position in positions:
+            self.entry.event_bridge.on_position(position)
+        for order in active_orders:
+            self.entry.event_bridge.on_order(order)
+        for trade in trades:
+            self.entry.event_bridge.on_trade(trade)
+
+        self.entry.logger.info(
+            "实盘 OMS 回补完成: positions=%s active_orders=%s trades=%s",
+            len(positions),
+            len(active_orders),
+            len(trades),
+        )
 
     def on_start(self) -> None:
         """执行启动钩子并初始化订阅状态。"""

@@ -135,11 +135,7 @@ class ChildProcess:
             
             # 4. 等待网关连接成功
             self._wait_for_connection()
-            
-            # 等待合约查询完成
-            self.logger.info("等待合约信息同步 (10s)...")
-            time.sleep(10.0)
-            
+
             all_contracts = self.main_engine.get_all_contracts()
             self.logger.info(f"MainEngine 获取到的合约总数: {len(all_contracts)}")
             if len(all_contracts) > 0:
@@ -258,11 +254,8 @@ class ChildProcess:
     def _wait_for_connection(self, timeout: float = 60.0) -> None:
         """等待网关连接成功"""
         self.logger.info(f"等待网关连接 (超时: {timeout}s)...")
-        
-        if self.gateway_manager.wait_for_connection(timeout):
-            self.logger.info("网关连接成功")
-        else:
-            raise TimeoutError("网关连接超时")
+        self.gateway_manager.wait_for_ready("trading", timeout)
+        self.logger.info("网关连接成功")
     
     def _load_strategies(self) -> None:
         """加载策略"""
@@ -315,9 +308,32 @@ class ChildProcess:
         for strategy_name in self.strategy_engine.strategies.keys():
             self.strategy_engine.init_strategy(strategy_name)
             self.logger.info(f"策略 {strategy_name} 初始化中...")
-        
-        # 等待初始化完成
-        time.sleep(5.0)
+
+        self._wait_for_strategies_initialized()
+
+    def _wait_for_strategies_initialized(
+        self,
+        timeout: float = 60.0,
+        check_interval: float = 0.5,
+    ) -> None:
+        """显式等待所有策略完成初始化。"""
+        deadline = time.monotonic() + timeout
+
+        while True:
+            not_ready = [
+                strategy_name
+                for strategy_name, strategy in self.strategy_engine.strategies.items()
+                if not getattr(strategy, "inited", False)
+            ]
+            if not not_ready:
+                return
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                joined = ", ".join(not_ready)
+                raise TimeoutError(f"策略初始化超时: {joined}")
+
+            time.sleep(min(check_interval, remaining))
     
     def _start_strategies(self) -> None:
         """启动所有策略"""

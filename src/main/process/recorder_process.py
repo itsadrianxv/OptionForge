@@ -141,10 +141,8 @@ class RecorderProcess:
     def _wait_for_connection(self, timeout: float = 60.0) -> None:
         """等待网关连接成功"""
         self.logger.info(f"等待网关连接 (超时: {timeout}s)...")
-        if self.gateway_manager.wait_for_connection(timeout):
-            self.logger.info("网关连接成功")
-        else:
-            raise TimeoutError("网关连接超时")
+        self.gateway_manager.wait_for_ready("recording", timeout)
+        self.logger.info("网关连接成功")
 
     def _run_event_loop(self) -> None:
         """运行事件循环"""
