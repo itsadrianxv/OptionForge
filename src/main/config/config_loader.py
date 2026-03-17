@@ -13,6 +13,7 @@ import importlib
 from pathlib import Path
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
+from src.strategy.runtime.registry import CAPABILITY_KEYS
 
 # Python 3.11+ 内置 tomllib，之前版本使用 tomli
 if sys.version_info >= (3, 11):
@@ -74,6 +75,26 @@ class ConfigLoader:
         return result
 
     @staticmethod
+    def load_service_activation_manifest(config: Dict[str, Any]) -> Dict[str, bool]:
+        raw = config.get("service_activation")
+        if not isinstance(raw, dict):
+            raise ValueError("[service_activation] must be a table")
+
+        unknown = sorted(set(raw) - set(CAPABILITY_KEYS))
+        missing = [key for key in CAPABILITY_KEYS if key not in raw]
+        if unknown or missing:
+            raise ValueError("service_activation keys must exactly match runtime registry")
+
+        manifest: Dict[str, bool] = {}
+        for key in CAPABILITY_KEYS:
+            value = raw[key]
+            if not isinstance(value, bool):
+                raise ValueError(f"service_activation '{key}' must be boolean")
+            manifest[key] = value
+
+        return manifest
+
+    @staticmethod
     def load_strategy_config(
         path: str,
         override_path: Optional[str] = None,
@@ -98,29 +119,28 @@ class ConfigLoader:
     @staticmethod
     def resolve_service_activation(config: Dict[str, Any]) -> Dict[str, bool]:
         """解析领域服务按需装配开关。"""
-        defaults = {
-            "future_selection": True,
-            "option_chain": True,
-            "option_selector": True,
-            "position_sizing": False,
-            "pricing_engine": False,
-            "greeks_calculator": False,
-            "portfolio_risk": False,
-            "smart_order_executor": False,
-            "advanced_order_scheduler": False,
-            "delta_hedging": False,
-            "vega_hedging": False,
-            "monitoring": True,
-            "decision_observability": True,
-        }
         raw = config.get("service_activation")
         if not isinstance(raw, dict):
-            return defaults
+            raise ValueError("[service_activation] must be a table")
 
-        resolved = dict(defaults)
-        for key, value in raw.items():
-            resolved[str(key)] = bool(value)
-        return resolved
+        unknown = sorted(set(raw) - set(CAPABILITY_KEYS))
+        missing = [key for key in CAPABILITY_KEYS if key not in raw]
+        if unknown or missing:
+            raise ValueError("service_activation keys must exactly match runtime registry")
+
+        manifest: Dict[str, bool] = {}
+        for key in CAPABILITY_KEYS:
+            value = raw[key]
+            if not isinstance(value, bool):
+                raise ValueError(f"service_activation '{key}' must be boolean")
+            manifest[key] = value
+
+        return manifest
+
+    @staticmethod
+    def resolve_service_activation(config: Dict[str, Any]) -> Dict[str, bool]:
+        """瑙ｆ瀽棰嗗煙鏈嶅姟鎸夐渶瑁呴厤寮€鍏炽€?"""
+        return ConfigLoader.load_service_activation_manifest(config)
     
     @staticmethod
     def load_gateway_config() -> Dict[str, Any]:
