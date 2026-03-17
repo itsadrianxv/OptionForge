@@ -16,8 +16,15 @@ from src.strategy.domain.value_object.signal import (
 
 
 sys.modules.setdefault("vnpy", MagicMock())
+sys.modules.setdefault("vnpy.event", MagicMock())
+sys.modules.setdefault("vnpy.event.engine", MagicMock())
 sys.modules.setdefault("vnpy.trader", MagicMock())
+sys.modules.setdefault("vnpy.trader.constant", MagicMock())
+sys.modules.setdefault("vnpy.trader.engine", MagicMock())
+sys.modules.setdefault("vnpy.trader.event", MagicMock())
 sys.modules.setdefault("vnpy.trader.object", MagicMock())
+sys.modules.setdefault("vnpy_portfoliostrategy", MagicMock())
+sys.modules.setdefault("vnpy_portfoliostrategy.utility", MagicMock())
 
 from src.strategy.application.market_workflow import MarketWorkflow  # noqa: E402
 
@@ -83,16 +90,11 @@ class _MarketGateway:
 def test_market_workflow_emits_decision_trace_for_open_pipeline() -> None:
     captured_traces: list[dict] = []
     option_chain_loader = MagicMock()
-
-    entry = SimpleNamespace()
-    entry.bar_pipeline = None
-    entry.target_aggregate = InstrumentManager()
-    entry.position_aggregate = PositionAggregate()
-    entry.market_gateway = _MarketGateway()
-    entry.indicator_service = _IndicatorService()
-    entry.signal_service = _SignalService()
-    entry.option_selector_service = MagicMock()
-    entry.option_selector_service.select_option_from_chain.return_value = OptionContract(
+    contract_selector = MagicMock()
+    greeks_enricher = MagicMock()
+    pricing_enricher = MagicMock()
+    sizing_evaluator = MagicMock()
+    selected_contract = OptionContract(
         vt_symbol="IO2506-C-3800.CFFEX",
         underlying_symbol="IF2506.CFFEX",
         option_type="call",
@@ -105,16 +107,38 @@ def test_market_workflow_emits_decision_trace_for_open_pipeline() -> None:
         ask_volume=20,
         days_to_expiry=30,
     )
+
+    entry = SimpleNamespace()
+    entry.bar_pipeline = None
+    entry.target_aggregate = InstrumentManager()
+    entry.position_aggregate = PositionAggregate()
+    entry.market_gateway = _MarketGateway()
+    entry.indicator_service = _IndicatorService()
+    entry.signal_service = _SignalService()
+    entry.option_selector_service = None
     entry.position_sizing_service = None
     entry.greeks_calculator = None
     entry.pricing_engine = None
     entry.runtime = SimpleNamespace(
         observability=SimpleNamespace(trace_sinks=[captured_traces.append]),
         state=SimpleNamespace(snapshot_sinks=[]),
-        open_pipeline=SimpleNamespace(option_chain_loader=option_chain_loader),
+        open_pipeline=SimpleNamespace(
+            option_chain_loader=option_chain_loader,
+            contract_selector=contract_selector,
+            greeks_enricher=greeks_enricher,
+            pricing_enricher=pricing_enricher,
+            sizing_evaluator=sizing_evaluator,
+        ),
     )
     entry.observability_config = {"emit_noop_decisions": False}
-    entry.service_activation = {"option_chain": False, "decision_observability": True}
+    entry.service_activation = {
+        "option_chain": False,
+        "option_selector": False,
+        "pricing_engine": False,
+        "greeks_calculator": False,
+        "position_sizing": False,
+        "decision_observability": True,
+    }
     entry.decision_journal = []
     entry.decision_journal_limit = 20
     entry.logger = MagicMock()
@@ -129,6 +153,10 @@ def test_market_workflow_emits_decision_trace_for_open_pipeline() -> None:
         instrument.latest_close,
         bar_data["datetime"],
     )
+    contract_selector.return_value = selected_contract
+    greeks_enricher.return_value = SimpleNamespace(delta=0.2, gamma=0.01, theta=-0.05, vega=0.3)
+    pricing_enricher.return_value = {"theoretical_price": 10.3, "pricing_model": "stub"}
+    sizing_evaluator.return_value = {"passed": True, "final_volume": 2, "summary": "runtime sizing"}
 
     workflow = MarketWorkflow(entry)
     bar = SimpleNamespace(
@@ -145,4 +173,10 @@ def test_market_workflow_emits_decision_trace_for_open_pipeline() -> None:
     assert entry.last_decision_trace is not None
     assert captured_traces
     assert any(stage["stage"] == "selection" for stage in captured_traces[-1]["stages"])
+    assert any(stage["stage"] == "pricing" and stage["status"] == "ok" for stage in captured_traces[-1]["stages"])
+    assert any(stage["stage"] == "sizing" and stage["status"] == "ok" for stage in captured_traces[-1]["stages"])
     option_chain_loader.assert_called_once()
+    contract_selector.assert_called_once()
+    greeks_enricher.assert_called_once()
+    pricing_enricher.assert_called_once()
+    sizing_evaluator.assert_called_once()

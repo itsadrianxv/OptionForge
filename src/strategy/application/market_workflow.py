@@ -33,6 +33,16 @@ class MarketWorkflow:
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
+    def _open_pipeline_role(self, role_name: str) -> Any:
+        runtime = getattr(self.entry, "runtime", None)
+        open_pipeline = getattr(runtime, "open_pipeline", None)
+        return getattr(open_pipeline, role_name, None)
+
+    def _close_pipeline_role(self, role_name: str) -> Any:
+        runtime = getattr(self.entry, "runtime", None)
+        close_pipeline = getattr(runtime, "close_pipeline", None)
+        return getattr(close_pipeline, role_name, None)
+
     def on_tick(self, tick: TickData) -> None:
         """处理逐笔行情推送，启用管道时转发给 K 线管道。"""
         if self.entry.bar_pipeline:
@@ -246,7 +256,11 @@ class MarketWorkflow:
             {"candidate_count": len(option_chain.entries)},
         )
 
-        selected_contract = self._select_contract_for_signal(open_signal, option_chain)
+        contract_selector = self._open_pipeline_role("contract_selector")
+        if contract_selector is not None:
+            selected_contract = contract_selector(open_signal, option_chain)
+        else:
+            selected_contract = self._select_contract_for_signal(open_signal, option_chain)
         if selected_contract is None:
             trace.append_stage("selection", "rejected", "未找到符合偏好的候选合约")
             return trace
@@ -262,13 +276,36 @@ class MarketWorkflow:
             },
         )
 
-        pricing_payload, greeks_result = self._build_pricing_payload(option_chain, selected_contract)
+        greeks_role = self._open_pipeline_role("greeks_enricher")
+        pricing_role = self._open_pipeline_role("pricing_enricher")
+        greeks_result = greeks_role(option_chain, selected_contract) if greeks_role is not None else None
+        pricing_payload = (
+            pricing_role(option_chain, selected_contract, greeks_result)
+            if pricing_role is not None
+            else None
+        )
+        if pricing_payload is None and greeks_result is None:
+            pricing_payload, greeks_result = self._build_pricing_payload(option_chain, selected_contract)
+        elif pricing_payload is None and greeks_result is not None:
+            pricing_payload = {
+                "delta": getattr(greeks_result, "delta", None),
+                "gamma": getattr(greeks_result, "gamma", None),
+                "theta": getattr(greeks_result, "theta", None),
+                "vega": getattr(greeks_result, "vega", None),
+            }
         if pricing_payload is None:
             trace.append_stage("pricing", "skipped", "未启用定价能力或缺少隐波数据")
         else:
             trace.append_stage("pricing", "ok", "完成价格/Greeks 快照计算", pricing_payload)
 
-        sizing_payload = self._build_sizing_payload(option_chain, selected_contract, greeks_result)
+        sizing_role = self._open_pipeline_role("sizing_evaluator")
+        sizing_payload = (
+            sizing_role(option_chain, selected_contract, greeks_result)
+            if sizing_role is not None
+            else None
+        )
+        if sizing_payload is None:
+            sizing_payload = self._build_sizing_payload(option_chain, selected_contract, greeks_result)
         if sizing_payload is None:
             trace.append_stage("sizing", "skipped", "未启用仓位能力或缺少必要账户数据")
         else:
@@ -334,7 +371,10 @@ class MarketWorkflow:
             {"position_vt_symbol": getattr(position, "vt_symbol", "")},
         )
 
-        close_payload = self._build_close_plan_payload(position)
+        close_volume_planner = self._close_pipeline_role("close_volume_planner")
+        close_payload = close_volume_planner(position) if close_volume_planner is not None else None
+        if close_payload is None:
+            close_payload = self._build_close_plan_payload(position)
         if close_payload is None:
             trace.append_stage("execution_plan", "skipped", "未启用平仓计划能力")
         else:
