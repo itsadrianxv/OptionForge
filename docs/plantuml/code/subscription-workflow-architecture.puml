@@ -1,0 +1,23 @@
+@startuml
+title Subscription Workflow - Architecture
+!pragma layout smetana
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+component "StrategyEntry" as entry
+component "SubscriptionWorkflow" as workflow
+component "SubscriptionModeEngine" as engine
+component "Market Gateway" as market
+component "Account Gateway" as account
+component "Target Aggregate" as target
+component "Position Aggregate" as positions
+component "Subscription Sets\nsubscribed / stale / temp" as state
+
+entry --> workflow : init + reconcile hooks
+workflow --> engine : resolve(context)
+workflow --> market : contracts, ticks,\nsubscribe/unsubscribe
+workflow --> account : get_all_positions()
+workflow --> target : active contracts by product
+workflow --> positions : active positions / pending orders
+workflow --> state : update temp symbols,\nstale timers, subscriptions
+@enduml

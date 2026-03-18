@@ -1,0 +1,29 @@
+@startuml
+title Lifecycle Workflow - Sequence
+autonumber
+
+participant "StrategyEntry" as entry
+participant "LifecycleWorkflow" as workflow
+participant "ConfigLoader" as config
+participant "SubscriptionWorkflow" as subscription
+participant "StateRepository" as repository
+participant "HistoryDataRepository" as history
+
+entry -> workflow : on_init()
+workflow -> config : load target products\n+ strategy config
+workflow -> subscription : init_subscription_management()
+workflow -> workflow : create services,\naggregates, gateways
+workflow -> workflow : record initial snapshot
+
+alt backtesting mode
+  workflow -> history : load_bars / replay warmup
+else live mode
+  workflow -> repository : load(strategy_name)
+  repository --> workflow : snapshot or not found
+  workflow -> workflow : sync OMS snapshot
+  workflow -> history : replay_bars_from_database()
+end
+
+workflow -> workflow : register Feishu alerts
+workflow --> entry : initialized runtime state
+@enduml

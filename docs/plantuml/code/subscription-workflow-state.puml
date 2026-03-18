@@ -1,0 +1,18 @@
+@startuml
+title Subscription Workflow - State
+skinparam shadowing false
+
+[*] --> Disabled
+Disabled --> Enabled : init config(enabled=true)
+Enabled --> Candidate : symbol enters target set
+Candidate --> Subscribed : subscribe(symbol)
+Subscribed --> Protected : still in target set
+Protected --> Stale : removed from target set
+Stale --> Subscribed : symbol reappears
+Stale --> Unsubscribed : TTL elapsed + unsubscribe(symbol)
+Unsubscribed --> Candidate : symbol returns
+Enabled --> TempTracked : signal-driven temporary symbol
+TempTracked --> Candidate : included in runtime context
+TempTracked --> Expired : TTL elapsed
+Expired --> [*]
+@enduml

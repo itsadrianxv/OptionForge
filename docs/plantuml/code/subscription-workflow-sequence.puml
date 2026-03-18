@@ -1,0 +1,29 @@
+@startuml
+title Subscription Workflow - Sequence
+autonumber
+
+participant "StrategyEntry" as entry
+participant "SubscriptionWorkflow" as workflow
+participant "Market Gateway" as market
+participant "Account Gateway" as account
+participant "SubscriptionModeEngine" as engine
+
+entry -> workflow : reconcile_subscriptions(trigger)
+workflow -> market : get_all_contracts()
+workflow -> workflow : collect active signal symbols
+workflow -> account : get_all_positions()
+workflow -> workflow : collect position + pending order symbols
+workflow -> workflow : get active contracts by product
+workflow -> engine : resolve(SubscriptionRuntimeContext)
+engine --> workflow : decision
+
+loop symbols to subscribe
+  workflow -> market : subscribe(symbol)
+end
+
+loop stale symbols to remove
+  workflow -> market : unsubscribe(symbol)
+end
+
+workflow --> entry : updated subscribed symbol state
+@enduml

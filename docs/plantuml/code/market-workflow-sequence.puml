@@ -1,0 +1,43 @@
+@startuml
+title Market Workflow - Sequence
+autonumber
+
+participant "StrategyEntry" as entry
+participant "MarketWorkflow" as workflow
+participant "Target Aggregate" as target
+participant "Market Gateway" as market
+participant "Indicator Service" as indicator
+participant "Signal Service" as signal
+participant "Decision Support" as support
+participant "Observability" as obs
+
+entry -> workflow : on_bars(bars)
+workflow -> workflow : rollover check + timer refresh
+workflow -> target : update_bar(vt_symbol, bar_data)
+target --> workflow : instrument
+workflow -> market : get_all_contracts / get_tick
+workflow -> workflow : build option chain snapshot
+workflow -> indicator : calculate_bar(instrument, context)
+indicator --> workflow : IndicatorComputationResult
+workflow -> signal : check_open_signal(...)
+signal --> workflow : SignalDecision?
+
+opt open signal present
+  workflow -> support : select contract
+  workflow -> support : compute greeks / pricing
+  workflow -> support : compute sizing
+  workflow -> obs : publish open trace
+end
+
+loop each active position
+  workflow -> signal : check_close_signal(...)
+  signal --> workflow : SignalDecision?
+  opt close signal present
+    workflow -> support : calculate_close_volume(...)
+    workflow -> obs : publish close trace
+  end
+end
+
+workflow -> obs : record snapshot / maybe autosave
+workflow --> entry : updated aggregates + traces
+@enduml

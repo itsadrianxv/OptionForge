@@ -1,0 +1,20 @@
+@startuml
+title State Workflow - Sequence
+autonumber
+
+participant "StrategyEntry" as entry
+participant "StateWorkflow" as workflow
+participant "Target Aggregate" as target
+participant "Position Aggregate" as positions
+participant "StrategyMonitor" as monitor
+
+entry -> workflow : create_snapshot()
+workflow -> target : to_snapshot()
+workflow -> positions : to_snapshot()
+workflow --> entry : snapshot dict
+
+entry -> workflow : record_snapshot()
+workflow -> monitor : record_snapshot(target,\npositions, entry)
+monitor --> workflow : ok / exception
+workflow --> entry : best-effort completion
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+title State Workflow - Architecture
+!pragma layout smetana
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+component "StrategyEntry" as entry
+component "StateWorkflow" as workflow
+component "Target Aggregate" as target
+component "Position Aggregate" as positions
+component "Combination Aggregate" as combinations
+component "StrategyMonitor" as monitor
+
+entry --> workflow : create / record snapshot
+workflow --> target : to_snapshot()
+workflow --> positions : to_snapshot()
+workflow --> combinations : optional to_snapshot()
+workflow --> monitor : record_snapshot(...)
+@enduml

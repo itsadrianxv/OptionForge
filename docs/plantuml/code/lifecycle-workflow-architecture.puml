@@ -1,0 +1,25 @@
+@startuml
+title Lifecycle Workflow - Architecture
+!pragma layout smetana
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+component "StrategyEntry" as entry
+component "LifecycleWorkflow" as workflow
+component "ConfigLoader" as config
+component "SubscriptionWorkflow" as subscription
+component "Domain Services" as domain
+component "Gateways" as gateways
+component "Persistence + Monitor" as persistence
+component "BarPipeline" as bars
+component "FeishuEventHandler" as alerts
+
+entry --> workflow : on_init / on_start / on_stop
+workflow --> config : load TOML + imports
+workflow --> subscription : init subscription mode
+workflow --> domain : create indicator/signal\nselection/pricing/risk services
+workflow --> gateways : create market/account/\norder/execution gateways
+workflow --> persistence : create repository,\nautosave, serializer, monitor
+workflow --> bars : build optional bar pipeline
+workflow --> alerts : register / unregister notifications
+@enduml

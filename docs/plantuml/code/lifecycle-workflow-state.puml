@@ -1,0 +1,15 @@
+@startuml
+title Lifecycle Workflow - State
+skinparam shadowing false
+
+[*] --> Constructed
+Constructed --> ConfigLoaded : on_init / load config
+ConfigLoaded --> DependenciesReady : create services,\naggregates, gateways
+DependenciesReady --> Restoring : live restore path
+DependenciesReady --> WarmingUp : backtest warmup path
+Restoring --> WarmingUp : replay history
+WarmingUp --> Ready : warmup finished
+Ready --> Running : on_start
+Running --> Stopping : on_stop
+Stopping --> Stopped : save snapshot,\nshutdown handlers
+@enduml

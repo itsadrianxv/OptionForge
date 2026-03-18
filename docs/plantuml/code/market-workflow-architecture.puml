@@ -1,0 +1,27 @@
+@startuml
+title Market Workflow - Architecture
+!pragma layout smetana
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+component "Tick / Bar Events" as events
+component "BarPipeline" as bar_pipeline
+component "MarketWorkflow" as workflow
+component "Target Aggregate" as target
+component "Position Aggregate" as positions
+component "Market + Account Gateways" as gateways
+component "Indicator + Signal Services" as signals
+component "Selection / Pricing /\nRisk / Sizing" as support
+component "Observability + Autosave" as observability
+component "Subscription hooks" as subscription
+
+events --> workflow : on_tick / on_bars
+workflow --> bar_pipeline : optional aggregation
+workflow --> target : update bars / validate universe
+workflow --> positions : inspect open positions
+workflow --> gateways : contracts, quotes,\naccount snapshots
+workflow --> signals : indicator + signal stages
+workflow --> support : selection, pricing,\ngreeks, sizing, close plan
+workflow --> observability : publish traces,\nrecord snapshots, autosave
+workflow --> subscription : timer / rollover refresh
+@enduml
