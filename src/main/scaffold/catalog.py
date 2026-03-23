@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import tomllib
 
+from src.strategy.runtime.registry import CAPABILITY_KEYS, CAPABILITY_REGISTRY
+
 from .config_params import resolve_config_payload
 from .models import (
     AutoFixPreview,
@@ -100,28 +102,19 @@ CAPABILITY_GROUP_OPTIONS: dict[CapabilityKey, tuple[CapabilityOptionKey, ...]] =
     CapabilityKey.OBSERVABILITY: (CapabilityOptionKey.DECISION_OBSERVABILITY,),
 }
 
+def _service_key_to_option(service_key: str) -> CapabilityOptionKey:
+    return CapabilityOptionKey(service_key.replace("_", "-"))
+
+
 CAPABILITY_OPTION_TO_SERVICE_KEY: dict[CapabilityOptionKey, str] = {
-    CapabilityOptionKey.FUTURE_SELECTION: "future_selection",
-    CapabilityOptionKey.OPTION_CHAIN: "option_chain",
-    CapabilityOptionKey.OPTION_SELECTOR: "option_selector",
-    CapabilityOptionKey.POSITION_SIZING: "position_sizing",
-    CapabilityOptionKey.PRICING_ENGINE: "pricing_engine",
-    CapabilityOptionKey.GREEKS_CALCULATOR: "greeks_calculator",
-    CapabilityOptionKey.PORTFOLIO_RISK: "portfolio_risk",
-    CapabilityOptionKey.SMART_ORDER_EXECUTOR: "smart_order_executor",
-    CapabilityOptionKey.ADVANCED_ORDER_SCHEDULER: "advanced_order_scheduler",
-    CapabilityOptionKey.DELTA_HEDGING: "delta_hedging",
-    CapabilityOptionKey.VEGA_HEDGING: "vega_hedging",
-    CapabilityOptionKey.MONITORING: "monitoring",
-    CapabilityOptionKey.DECISION_OBSERVABILITY: "decision_observability",
+    option: option.value.replace("-", "_")
+    for option in CAPABILITY_OPTION_ORDER
 }
 
 CAPABILITY_OPTION_DEPENDENCIES: dict[CapabilityOptionKey, tuple[CapabilityOptionKey, ...]] = {
-    CapabilityOptionKey.OPTION_SELECTOR: (CapabilityOptionKey.OPTION_CHAIN,),
-    CapabilityOptionKey.PORTFOLIO_RISK: (CapabilityOptionKey.GREEKS_CALCULATOR,),
-    CapabilityOptionKey.ADVANCED_ORDER_SCHEDULER: (CapabilityOptionKey.SMART_ORDER_EXECUTOR,),
-    CapabilityOptionKey.DELTA_HEDGING: (CapabilityOptionKey.GREEKS_CALCULATOR,),
-    CapabilityOptionKey.VEGA_HEDGING: (CapabilityOptionKey.GREEKS_CALCULATOR,),
+    _service_key_to_option(spec.key): tuple(_service_key_to_option(item) for item in spec.requires)
+    for spec in CAPABILITY_REGISTRY.values()
+    if spec.requires
 }
 
 CAPABILITY_OPTION_MUTEX_RULES: tuple[
@@ -151,21 +144,7 @@ PRESET_OPTION_BLOCKLISTS: dict[str, dict[CapabilityOptionKey, str]] = {
     },
 }
 
-SERVICE_ACTIVATION_KEYS: tuple[str, ...] = (
-    "future_selection",
-    "option_chain",
-    "option_selector",
-    "position_sizing",
-    "pricing_engine",
-    "greeks_calculator",
-    "portfolio_risk",
-    "smart_order_executor",
-    "advanced_order_scheduler",
-    "delta_hedging",
-    "vega_hedging",
-    "monitoring",
-    "decision_observability",
-)
+SERVICE_ACTIVATION_KEYS: tuple[str, ...] = CAPABILITY_KEYS
 
 BASE_COPY_PATHS: tuple[str, ...] = (
     ".codex",

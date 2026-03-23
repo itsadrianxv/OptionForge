@@ -33,6 +33,21 @@ class MarketWorkflow:
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
+    def _open_pipeline_role(self, role_name: str) -> Any:
+        runtime = getattr(self.entry, "runtime", None)
+        open_pipeline = getattr(runtime, "open_pipeline", None)
+        return getattr(open_pipeline, role_name, None)
+
+    def _close_pipeline_role(self, role_name: str) -> Any:
+        runtime = getattr(self.entry, "runtime", None)
+        close_pipeline = getattr(runtime, "close_pipeline", None)
+        return getattr(close_pipeline, role_name, None)
+
+    def _portfolio_role(self, role_name: str) -> Any:
+        runtime = getattr(self.entry, "runtime", None)
+        portfolio = getattr(runtime, "portfolio", None)
+        return getattr(portfolio, role_name, None)
+
     def on_tick(self, tick: TickData) -> None:
         """处理逐笔行情推送，启用管道时转发给 K 线管道。"""
         if self.entry.bar_pipeline:
@@ -46,11 +61,14 @@ class MarketWorkflow:
             first_bar = next(iter(bars.values()))
             current_dt = first_bar.datetime
             rollover_changed = False
+            runtime = getattr(self.entry, "runtime", None)
+            universe = getattr(runtime, "universe", None)
+            rollover_checker = getattr(universe, "rollover_checker", None)
 
             if (
                 current_dt.hour == 14
                 and current_dt.minute == 50
-                and self.entry.future_selection_service is not None
+                and rollover_checker is not None
             ):
                 if not self.entry.rollover_check_done:
                     self.entry.logger.info(f"触发每日换月检查: {current_dt}")
@@ -129,7 +147,7 @@ class MarketWorkflow:
 
             try:
                 instrument = self.entry.target_aggregate.update_bar(vt_symbol, bar_data)
-                option_chain = self._build_option_chain_snapshot(vt_symbol, instrument.latest_close, bar_data["datetime"])
+                option_chain = self._build_option_chain_snapshot(vt_symbol, instrument, bar_data)
                 indicator_context = self._build_indicator_context(vt_symbol, instrument, bar_data, option_chain)
                 indicator_result = self._run_indicator_stage(instrument, bar_data, indicator_context)
 
@@ -243,7 +261,11 @@ class MarketWorkflow:
             {"candidate_count": len(option_chain.entries)},
         )
 
-        selected_contract = self._select_contract_for_signal(open_signal, option_chain)
+        contract_selector = self._open_pipeline_role("contract_selector")
+        if contract_selector is not None:
+            selected_contract = contract_selector(open_signal, option_chain)
+        else:
+            selected_contract = None
         if selected_contract is None:
             trace.append_stage("selection", "rejected", "未找到符合偏好的候选合约")
             return trace
@@ -259,13 +281,34 @@ class MarketWorkflow:
             },
         )
 
-        pricing_payload, greeks_result = self._build_pricing_payload(option_chain, selected_contract)
+        greeks_role = self._open_pipeline_role("greeks_enricher")
+        pricing_role = self._open_pipeline_role("pricing_enricher")
+        greeks_result = greeks_role(option_chain, selected_contract) if greeks_role is not None else None
+        pricing_payload = (
+            pricing_role(option_chain, selected_contract, greeks_result)
+            if pricing_role is not None
+            else None
+        )
+        if pricing_payload is None and greeks_result is not None:
+            pricing_payload = {
+                "delta": getattr(greeks_result, "delta", None),
+                "gamma": getattr(greeks_result, "gamma", None),
+                "theta": getattr(greeks_result, "theta", None),
+                "vega": getattr(greeks_result, "vega", None),
+            }
         if pricing_payload is None:
             trace.append_stage("pricing", "skipped", "未启用定价能力或缺少隐波数据")
         else:
             trace.append_stage("pricing", "ok", "完成价格/Greeks 快照计算", pricing_payload)
 
-        sizing_payload = self._build_sizing_payload(option_chain, selected_contract, greeks_result)
+        sizing_role = self._open_pipeline_role("sizing_evaluator")
+        sizing_payload = (
+            sizing_role(option_chain, selected_contract, greeks_result)
+            if sizing_role is not None
+            else None
+        )
+        if False:
+            sizing_payload = None
         if sizing_payload is None:
             trace.append_stage("sizing", "skipped", "未启用仓位能力或缺少必要账户数据")
         else:
@@ -287,6 +330,27 @@ class MarketWorkflow:
                 "suggested_volume": sizing_payload.get("final_volume") if sizing_payload else None,
             },
         )
+        execution_planner = self._open_pipeline_role("execution_planner")
+        execution_scheduler = self._open_pipeline_role("execution_scheduler")
+        if execution_planner is not None:
+            runtime_execution_plan = execution_planner(selected_contract, open_signal, sizing_payload)
+            if execution_scheduler is not None:
+                runtime_execution_plan = execution_scheduler(runtime_execution_plan)
+            trace.append_stage("execution_plan", "planned", "runtime execution planned", runtime_execution_plan)
+
+        rebalance_planner = self._portfolio_role("rebalance_planner")
+        if rebalance_planner is not None:
+            rebalance_plan = rebalance_planner(
+                vt_symbol=vt_symbol,
+                instrument=instrument,
+                option_chain=option_chain,
+                selected_contract=selected_contract,
+                pricing_payload=pricing_payload,
+                sizing_payload=sizing_payload,
+            )
+            if rebalance_plan is not None:
+                trace.append_stage("rebalance_plan", "planned", "runtime rebalance planned", rebalance_plan)
+
         return trace
 
     def _run_close_pipeline(
@@ -331,7 +395,10 @@ class MarketWorkflow:
             {"position_vt_symbol": getattr(position, "vt_symbol", "")},
         )
 
-        close_payload = self._build_close_plan_payload(position)
+        close_volume_planner = self._close_pipeline_role("close_volume_planner")
+        close_payload = close_volume_planner(position) if close_volume_planner is not None else None
+        if False:
+            close_payload = None
         if close_payload is None:
             trace.append_stage("execution_plan", "skipped", "未启用平仓计划能力")
         else:
@@ -374,11 +441,22 @@ class MarketWorkflow:
     def _build_option_chain_snapshot(
         self,
         underlying_vt_symbol: str,
+        instrument: Any,
+        bar_data: Dict[str, Any],
+    ) -> Optional[OptionChainSnapshot]:
+        runtime = getattr(self.entry, "runtime", None)
+        open_pipeline = getattr(runtime, "open_pipeline", None)
+        option_chain_loader = getattr(open_pipeline, "option_chain_loader", None)
+        if option_chain_loader is not None:
+            return option_chain_loader(underlying_vt_symbol, instrument, bar_data)
+        return None
+
+    def _build_option_chain_snapshot_from_gateway(
+        self,
+        underlying_vt_symbol: str,
         underlying_price: float,
         as_of: Any,
     ) -> Optional[OptionChainSnapshot]:
-        if not self.entry.service_activation.get("option_chain", True):
-            return None
         if not self.entry.market_gateway:
             return None
         contracts = self.entry.market_gateway.get_all_contracts()
@@ -588,13 +666,14 @@ class MarketWorkflow:
 
         payload = trace.to_payload()
         self.entry.last_decision_trace = trace
-        if self.entry.service_activation.get("decision_observability", True):
-            self.entry.decision_journal.append(payload)
-            maxlen = max(int(getattr(self.entry, "decision_journal_limit", 200) or 200), 1)
-            if len(self.entry.decision_journal) > maxlen:
-                self.entry.decision_journal = self.entry.decision_journal[-maxlen:]
-            if self.entry.monitor:
-                self.entry.monitor.record_decision_trace(payload)
+        runtime = getattr(self.entry, "runtime", None)
+        observability = getattr(runtime, "observability", None)
+        trace_sinks = tuple(getattr(observability, "trace_sinks", ()) or ())
+        for sink in trace_sinks:
+            try:
+                sink(payload)
+            except Exception as e:
+                self.entry.logger.error(f"鍐崇瓥 trace 鍙戝竷澶辫触: {e}")
 
     def validate_universe(self) -> None:
         """确保每个配置品种都有可用主力合约。"""
