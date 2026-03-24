@@ -174,6 +174,73 @@ class OrderRetryExhaustedEvent(DomainEvent):
     final_price: float = 0.0
 
 
+@dataclass
+class ExecutionIntentStartedEvent(DomainEvent):
+    scope: str = ""
+    identifier: str = ""
+    intent_id: str = ""
+    action: str = ""
+    phase: str = ""
+    priority: int = 0
+
+
+@dataclass
+class ExecutionPhaseChangedEvent(DomainEvent):
+    scope: str = ""
+    identifier: str = ""
+    intent_id: str = ""
+    old_phase: str = ""
+    new_phase: str = ""
+    reason: str = ""
+
+
+@dataclass
+class ExecutionPreemptedEvent(DomainEvent):
+    scope: str = ""
+    identifier: str = ""
+    previous_intent_id: str = ""
+    new_intent_id: str = ""
+    old_priority: int = 0
+    new_priority: int = 0
+    reason: str = ""
+
+
+@dataclass
+class LegExecutionBlockedEvent(DomainEvent):
+    scope: str = ""
+    identifier: str = ""
+    intent_id: str = ""
+    blocked_by_intent_id: str = ""
+    requested_action: str = ""
+    current_phase: str = ""
+    incoming_priority: int = 0
+    active_priority: int = 0
+    reason: str = ""
+
+
+@dataclass
+class CombinationExecutionStartedEvent(DomainEvent):
+    combination_id: str = ""
+    intent_id: str = ""
+    action: str = ""
+    phase: str = ""
+
+
+@dataclass
+class CombinationExecutionCompletedEvent(DomainEvent):
+    combination_id: str = ""
+    intent_id: str = ""
+    phase: str = ""
+
+
+@dataclass
+class CombinationExecutionFailedEvent(DomainEvent):
+    combination_id: str = ""
+    intent_id: str = ""
+    phase: str = ""
+    reason: str = ""
+
+
 # ========== 策略告警数据 (用于飞书通知) ==========
 @dataclass
 class StrategyAlertData:

@@ -1,4 +1,4 @@
-"""绛栫暐鍏ュ彛鐨勭姸鎬佹寔涔呭寲涓庣洃鎺у伐浣滄祦銆?"""
+"""State workflow for snapshot creation and runtime snapshot sinks."""
 
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ if TYPE_CHECKING:
 
 
 class StateWorkflow:
-    """澶勭悊鐘舵€佸揩鐓т笌鐩戞帶璁板綍銆?"""
+    """Builds strategy snapshots and dispatches optional snapshot sinks."""
 
     def __init__(self, entry: "StrategyEntry") -> None:
         self.entry = entry
 
     def create_snapshot(self) -> Dict[str, Any]:
-        """鍒涘缓鐢ㄤ簬鎸佷箙鍖栫殑鑱氬悎蹇収銆?"""
         snapshot = {
             "target_aggregate": self.entry.target_aggregate.to_snapshot(),
             "position_aggregate": self.entry.position_aggregate.to_snapshot(),
@@ -23,10 +22,26 @@ class StateWorkflow:
         }
         if self.entry.combination_aggregate:
             snapshot["combination_aggregate"] = self.entry.combination_aggregate.to_snapshot()
+
+        runtime = getattr(self.entry, "runtime", None)
+        state_roles = getattr(runtime, "state", None)
+        snapshot_dumpers = tuple(getattr(state_roles, "snapshot_dumpers", ()) or ())
+        for dumper in snapshot_dumpers:
+            try:
+                extra = dumper(
+                    self.entry.target_aggregate,
+                    self.entry.position_aggregate,
+                    self.entry.combination_aggregate,
+                    self.entry,
+                )
+                if isinstance(extra, dict):
+                    snapshot.update(extra)
+            except Exception as exc:
+                self.entry.logger.error(f"execution snapshot dump failed: {exc}")
+
         return snapshot
 
     def record_snapshot(self) -> None:
-        """灏嗚繍琛屾椂蹇収鍐欏叆 runtime snapshot sinks銆?"""
         runtime = getattr(self.entry, "runtime", None)
         state_roles = getattr(runtime, "state", None)
         snapshot_sinks = tuple(getattr(state_roles, "snapshot_sinks", ()) or ())
@@ -40,5 +55,5 @@ class StateWorkflow:
                     self.entry.position_aggregate,
                     self.entry,
                 )
-            except Exception as e:
-                self.entry.logger.error(f"璁板綍蹇収澶辫触: {e}")
+            except Exception as exc:
+                self.entry.logger.error(f"snapshot sink failed: {exc}")

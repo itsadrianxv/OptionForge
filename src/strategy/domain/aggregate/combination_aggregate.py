@@ -1,206 +1,240 @@
-"""
-CombinationAggregate - 组合策略聚合根
+"""Combination aggregate with lifecycle and combination execution state."""
 
-管理组合策略的注册、查询、状态同步和领域事件。
-独立于 PositionAggregate，通过领域事件协调状态同步。
-"""
+from __future__ import annotations
+
 from typing import Any, Dict, List, Optional, Set
 
 from ..entity.combination import Combination
+from ..event.event_types import (
+    CombinationExecutionCompletedEvent,
+    CombinationExecutionFailedEvent,
+    CombinationExecutionStartedEvent,
+    CombinationStatusChangedEvent,
+    DomainEvent,
+    ExecutionPhaseChangedEvent,
+    ExecutionPreemptedEvent,
+    LegExecutionBlockedEvent,
+)
 from ..value_object.combination import CombinationStatus
-from ..event.event_types import DomainEvent, CombinationStatusChangedEvent
+from ..value_object.trading.execution_state import (
+    CombinationExecutionState,
+    ExecutionAction,
+    ExecutionMode,
+    ExecutionPhase,
+    ExecutionPriority,
+    PositionExecutionState,
+)
 
 
 class CombinationAggregate:
-    """
-    组合策略聚合根
-
-    职责:
-    1. 管理 Combination 注册表（按 combination_id 索引）
-    2. 维护 vt_symbol → combination_id 的反向索引（用于事件驱动的状态同步）
-    3. 保护 Combination 的结构不变量（创建时验证）
-    4. 协调 Combination 状态机转换
-    5. 管理领域事件队列
-    """
+    """Owns registered combinations and combination-level execution state."""
 
     def __init__(self) -> None:
-        """初始化聚合根"""
-        # 组合注册表 (按 combination_id 索引)
         self._combinations: Dict[str, Combination] = {}
-        # 反向索引: vt_symbol → {combination_id}
         self._symbol_index: Dict[str, Set[str]] = {}
-        # 领域事件队列
+        self._execution_states: Dict[str, CombinationExecutionState] = {}
         self._domain_events: List[DomainEvent] = []
 
-    # ========== 持久化接口 ==========
-
     def to_snapshot(self) -> Dict[str, Any]:
-        """
-        生成状态快照
-
-        Returns:
-            包含 combinations 和 symbol_index 的字典
-        """
         return {
-            "combinations": {
-                cid: combo.to_dict()
-                for cid, combo in self._combinations.items()
-            },
-            "symbol_index": {
-                symbol: list(cids)
-                for symbol, cids in self._symbol_index.items()
-            },
+            "combinations": {cid: combo.to_dict() for cid, combo in self._combinations.items()},
+            "symbol_index": {symbol: list(cids) for symbol, cids in self._symbol_index.items()},
         }
 
     @classmethod
     def from_snapshot(cls, snapshot: Dict[str, Any]) -> "CombinationAggregate":
-        """
-        从快照恢复状态
-
-        Args:
-            snapshot: 快照字典
-
-        Returns:
-            恢复的 CombinationAggregate 实例
-        """
         obj = cls()
-
-        # 恢复 combinations
-        combinations_data = snapshot.get("combinations", {})
-        for cid, combo_dict in combinations_data.items():
+        for cid, combo_dict in snapshot.get("combinations", {}).items():
             obj._combinations[cid] = Combination.from_dict(combo_dict)
-
-        # 恢复 symbol_index
-        symbol_index_data = snapshot.get("symbol_index", {})
-        for symbol, cids in symbol_index_data.items():
+        for symbol, cids in snapshot.get("symbol_index", {}).items():
             obj._symbol_index[symbol] = set(cids)
-
         return obj
 
-    # ========== 组合管理接口 ==========
-
     def register_combination(self, combination: Combination) -> None:
-        """
-        注册新组合（验证结构约束后注册）
-
-        - 调用 combination.validate() 验证结构
-        - 注册到 _combinations 字典
-        - 建立 vt_symbol → combination_id 反向索引
-
-        Args:
-            combination: 要注册的 Combination 实体
-
-        Raises:
-            ValueError: 如果组合结构不满足约束
-        """
-        # 验证结构约束
         combination.validate()
-
-        # 注册到组合字典
         self._combinations[combination.combination_id] = combination
-
-        # 建立反向索引
         for leg in combination.legs:
-            if leg.vt_symbol not in self._symbol_index:
-                self._symbol_index[leg.vt_symbol] = set()
-            self._symbol_index[leg.vt_symbol].add(combination.combination_id)
+            self._symbol_index.setdefault(leg.vt_symbol, set()).add(combination.combination_id)
 
     def get_combination(self, combination_id: str) -> Optional[Combination]:
-        """
-        按 combination_id 获取组合
-
-        Args:
-            combination_id: 组合唯一标识符
-
-        Returns:
-            Combination 实体，不存在则返回 None
-        """
         return self._combinations.get(combination_id)
 
-    def get_combinations_by_underlying(
-        self, underlying: str
-    ) -> List[Combination]:
-        """
-        按标的合约查询所有关联的 Combination
-
-        Args:
-            underlying: 标的合约代码
-
-        Returns:
-            匹配该标的的 Combination 列表
-        """
-        return [
-            combo
-            for combo in self._combinations.values()
-            if combo.underlying_vt_symbol == underlying
-        ]
+    def get_combinations_by_underlying(self, underlying: str) -> List[Combination]:
+        return [combo for combo in self._combinations.values() if combo.underlying_vt_symbol == underlying]
 
     def get_active_combinations(self) -> List[Combination]:
-        """
-        获取所有活跃（非 CLOSED）的 Combination
-
-        Returns:
-            活跃的 Combination 列表
-        """
-        return [
-            combo
-            for combo in self._combinations.values()
-            if combo.status != CombinationStatus.CLOSED
-        ]
+        return [combo for combo in self._combinations.values() if combo.status != CombinationStatus.CLOSED]
 
     def get_combinations_by_symbol(self, vt_symbol: str) -> List[Combination]:
-        """
-        通过反向索引查找引用指定 vt_symbol 的所有 Combination
-
-        Args:
-            vt_symbol: 期权合约代码
-
-        Returns:
-            引用该 vt_symbol 的 Combination 列表
-        """
         combination_ids = self._symbol_index.get(vt_symbol, set())
-        return [
-            self._combinations[cid]
-            for cid in combination_ids
-            if cid in self._combinations
-        ]
+        return [self._combinations[cid] for cid in combination_ids if cid in self._combinations]
 
-    # ========== 状态同步接口 ==========
+    def get_execution_state(self, combination_id: str) -> CombinationExecutionState:
+        return self._ensure_execution_state(combination_id)
+
+    def get_all_execution_states(self) -> Dict[str, CombinationExecutionState]:
+        return dict(self._execution_states)
+
+    def dump_execution_states(self) -> Dict[str, CombinationExecutionState]:
+        return dict(self._execution_states)
+
+    def restore_execution_states(self, states: Dict[str, CombinationExecutionState]) -> None:
+        self._execution_states = dict(states)
+
+    def acquire_combination_intent(
+        self,
+        combination_id: str,
+        intent_id: str,
+        action: ExecutionAction,
+        priority: ExecutionPriority = ExecutionPriority.OPEN_SIGNAL,
+        execution_mode: ExecutionMode = ExecutionMode.ALL_LEGS_REQUIRED,
+        reason: str = "",
+    ) -> CombinationExecutionState:
+        state = self._ensure_execution_state(combination_id)
+        if state.phase.is_active:
+            if priority <= state.priority:
+                self._domain_events.append(
+                    LegExecutionBlockedEvent(
+                        scope="combination",
+                        identifier=combination_id,
+                        intent_id=intent_id,
+                        blocked_by_intent_id=state.intent_id,
+                        requested_action=action.value,
+                        current_phase=state.phase.value,
+                        incoming_priority=int(priority),
+                        active_priority=int(state.priority),
+                        reason=reason,
+                    )
+                )
+                raise RuntimeError(f"combination execution blocked for {combination_id}")
+            self._domain_events.append(
+                ExecutionPreemptedEvent(
+                    scope="combination",
+                    identifier=combination_id,
+                    previous_intent_id=state.intent_id,
+                    new_intent_id=intent_id,
+                    old_priority=int(state.priority),
+                    new_priority=int(priority),
+                    reason=reason,
+                )
+            )
+
+        new_state = CombinationExecutionState(
+            combination_id=combination_id,
+            intent_id=intent_id,
+            action=action,
+            phase=ExecutionPhase.RESERVING_LEGS,
+            priority=priority,
+            execution_mode=execution_mode,
+            reason=reason,
+        )
+        self._execution_states[combination_id] = new_state
+        self._domain_events.append(
+            CombinationExecutionStartedEvent(
+                combination_id=combination_id,
+                intent_id=intent_id,
+                action=action.value,
+                phase=new_state.phase.value,
+            )
+        )
+        return new_state
+
+    def attach_leg_intent(self, combination_id: str, vt_symbol: str, leg_intent_id: str) -> None:
+        combination = self.get_combination(combination_id)
+        if combination is None:
+            raise KeyError(combination_id)
+        if vt_symbol not in {leg.vt_symbol for leg in combination.legs}:
+            raise ValueError(f"{vt_symbol} not in combination {combination_id}")
+
+        state = self._ensure_execution_state(combination_id)
+        state.leg_intents[vt_symbol] = leg_intent_id
+        state.leg_phases.setdefault(vt_symbol, ExecutionPhase.RESERVED)
+        state.mark_updated()
+
+    def update_leg_phase(
+        self,
+        combination_id: str,
+        vt_symbol: str,
+        phase: ExecutionPhase,
+    ) -> None:
+        state = self._ensure_execution_state(combination_id)
+        old_phase = state.phase
+        state.leg_phases[vt_symbol] = phase
+        state.phase = self._derive_phase(state)
+        state.mark_updated()
+        if old_phase != state.phase:
+            self._domain_events.append(
+                ExecutionPhaseChangedEvent(
+                    scope="combination",
+                    identifier=combination_id,
+                    intent_id=state.intent_id,
+                    old_phase=old_phase.value,
+                    new_phase=state.phase.value,
+                    reason=f"leg:{vt_symbol}",
+                )
+            )
+
+        if state.phase == ExecutionPhase.COMPLETED:
+            self._domain_events.append(
+                CombinationExecutionCompletedEvent(
+                    combination_id=combination_id,
+                    intent_id=state.intent_id,
+                    phase=state.phase.value,
+                )
+            )
+        elif state.phase == ExecutionPhase.FAILED:
+            self._domain_events.append(
+                CombinationExecutionFailedEvent(
+                    combination_id=combination_id,
+                    intent_id=state.intent_id,
+                    phase=state.phase.value,
+                    reason=f"leg:{vt_symbol}",
+                )
+            )
+
+    def request_combination_cancel(self, combination_id: str, reason: str = "") -> None:
+        state = self._ensure_execution_state(combination_id)
+        self._set_phase(state, ExecutionPhase.CANCELLING, reason or "cancel_requested")
+
+    def preempt_combination(self, combination_id: str, new_intent_id: str, reason: str = "") -> None:
+        state = self._ensure_execution_state(combination_id)
+        state.preempted_by_intent_id = new_intent_id
+        self._set_phase(state, ExecutionPhase.PREEMPTED, reason or "preempted")
+
+    def sync_execution_states(
+        self,
+        position_execution_states: Dict[str, PositionExecutionState],
+    ) -> None:
+        for combination_id, state in list(self._execution_states.items()):
+            combination = self._combinations.get(combination_id)
+            if combination is None:
+                continue
+            changed = False
+            for leg in combination.legs:
+                leg_state = position_execution_states.get(leg.vt_symbol)
+                if leg_state is None:
+                    continue
+                if state.leg_phases.get(leg.vt_symbol) != leg_state.phase:
+                    state.leg_phases[leg.vt_symbol] = leg_state.phase
+                    changed = True
+            if changed:
+                new_phase = self._derive_phase(state)
+                if state.phase != new_phase:
+                    self._set_phase(state, new_phase, "position_execution_sync")
 
     def sync_combination_status(
         self,
         vt_symbol: str,
         closed_vt_symbols: Set[str],
+        position_execution_states: Optional[Dict[str, PositionExecutionState]] = None,
     ) -> None:
-        """
-        当 Position 状态变化时，同步更新关联的 Combination 状态。
-
-        由应用服务在收到 PositionClosedEvent 后调用。
-
-        流程:
-        1. 通过 _symbol_index 查找引用该 vt_symbol 的所有 Combination
-        2. 对每个 Combination 调用 update_status(closed_vt_symbols)
-        3. 如果状态发生变化，产生 CombinationStatusChangedEvent
-
-        Args:
-            vt_symbol: 发生状态变化的期权合约代码
-            closed_vt_symbols: 所有已平仓的 vt_symbol 集合
-        """
-        # 通过反向索引查找关联的 Combination
         combination_ids = self._symbol_index.get(vt_symbol, set())
-
         for cid in combination_ids:
             combination = self._combinations.get(cid)
             if combination is None:
                 continue
-
-            # 记录旧状态
             old_status = combination.status
-
-            # 更新状态
             new_status = combination.update_status(closed_vt_symbols)
-
-            # 如果状态发生变化，产生领域事件
             if new_status is not None:
                 self._domain_events.append(
                     CombinationStatusChangedEvent(
@@ -211,31 +245,92 @@ class CombinationAggregate:
                     )
                 )
 
-    # ========== 领域事件接口 ==========
+        if position_execution_states:
+            self.sync_execution_states(position_execution_states)
 
     def pop_domain_events(self) -> List[DomainEvent]:
-        """
-        获取并清空领域事件队列
-
-        Returns:
-            领域事件列表
-        """
         events = self._domain_events.copy()
         self._domain_events.clear()
         return events
 
     def has_pending_events(self) -> bool:
-        """
-        检查是否有待处理的领域事件
-
-        Returns:
-            True 如果有待处理事件
-        """
         return len(self._domain_events) > 0
-
-    # ========== 辅助方法 ==========
 
     def __repr__(self) -> str:
         total = len(self._combinations)
         active = len(self.get_active_combinations())
         return f"CombinationAggregate(total={total}, active={active})"
+
+    def _ensure_execution_state(self, combination_id: str) -> CombinationExecutionState:
+        state = self._execution_states.get(combination_id)
+        if state is None:
+            state = CombinationExecutionState(combination_id=combination_id)
+            self._execution_states[combination_id] = state
+        return state
+
+    def _set_phase(
+        self,
+        state: CombinationExecutionState,
+        phase: ExecutionPhase,
+        reason: str,
+    ) -> None:
+        old_phase = state.phase
+        if old_phase == phase:
+            state.mark_updated()
+            return
+        state.phase = phase
+        state.mark_updated()
+        self._domain_events.append(
+            ExecutionPhaseChangedEvent(
+                scope="combination",
+                identifier=state.combination_id,
+                intent_id=state.intent_id,
+                old_phase=old_phase.value,
+                new_phase=phase.value,
+                reason=reason,
+            )
+        )
+
+    def _derive_phase(self, state: CombinationExecutionState) -> ExecutionPhase:
+        if not state.leg_phases:
+            return ExecutionPhase.RESERVING_LEGS
+
+        phases = list(state.leg_phases.values())
+        unique_phases = set(phases)
+
+        if state.execution_mode == ExecutionMode.ALL_LEGS_REQUIRED and any(
+            phase in {ExecutionPhase.FAILED, ExecutionPhase.PREEMPTED}
+            for phase in phases
+        ):
+            if all(
+                phase in {ExecutionPhase.COMPLETED, ExecutionPhase.FAILED, ExecutionPhase.PREEMPTED}
+                for phase in phases
+            ):
+                return ExecutionPhase.FAILED
+            return ExecutionPhase.DEGRADED
+
+        if all(phase == ExecutionPhase.RESERVED for phase in phases):
+            return ExecutionPhase.RESERVING_LEGS
+        if all(phase == ExecutionPhase.COMPLETED for phase in phases):
+            return ExecutionPhase.COMPLETED
+        if any(phase == ExecutionPhase.CANCEL_PENDING for phase in phases):
+            return ExecutionPhase.CANCELLING
+        if any(phase == ExecutionPhase.PARTIAL_FILLED for phase in phases):
+            return ExecutionPhase.PARTIAL
+        if ExecutionPhase.COMPLETED in unique_phases and len(unique_phases) > 1:
+            return ExecutionPhase.PARTIAL
+        if any(
+            phase in {
+                ExecutionPhase.WORKING,
+                ExecutionPhase.SUBMITTING,
+                ExecutionPhase.RETRY_PENDING,
+                ExecutionPhase.RESERVED,
+            }
+            for phase in phases
+        ):
+            return ExecutionPhase.ACTIVE
+        if any(phase == ExecutionPhase.PREEMPTED for phase in phases):
+            return ExecutionPhase.PREEMPTED
+        if any(phase == ExecutionPhase.FAILED for phase in phases):
+            return ExecutionPhase.FAILED
+        return state.phase

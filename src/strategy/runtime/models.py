@@ -53,6 +53,8 @@ class PortfolioRoles:
 @dataclass(slots=True)
 class StateRoles:
     snapshot_sinks: tuple[RuntimeCallable, ...] = ()
+    snapshot_dumpers: tuple[RuntimeCallable, ...] = ()
+    restore_hooks: tuple[RuntimeCallable, ...] = ()
 
 
 @dataclass(slots=True)

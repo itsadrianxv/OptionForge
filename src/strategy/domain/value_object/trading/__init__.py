@@ -5,6 +5,14 @@ Trading 子模块 - 交易相关值对象
 """
 from .order_instruction import OrderInstruction, Direction, Offset, OrderType
 from .order_execution import OrderExecutionConfig, ManagedOrder
+from .execution_state import (
+    CombinationExecutionState,
+    ExecutionAction,
+    ExecutionMode,
+    ExecutionPhase,
+    ExecutionPriority,
+    PositionExecutionState,
+)
 from .advanced_order import (
     AdvancedOrderType, AdvancedOrderStatus,
     AdvancedOrderRequest, AdvancedOrder, ChildOrder, SliceEntry,
@@ -17,6 +25,12 @@ __all__ = [
     "OrderType",
     "OrderExecutionConfig",
     "ManagedOrder",
+    "ExecutionAction",
+    "ExecutionMode",
+    "ExecutionPhase",
+    "ExecutionPriority",
+    "PositionExecutionState",
+    "CombinationExecutionState",
     "AdvancedOrderType",
     "AdvancedOrderStatus",
     "AdvancedOrderRequest",

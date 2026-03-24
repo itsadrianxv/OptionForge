@@ -42,6 +42,7 @@ class EventBridge:
             "status": order.status.value if hasattr(order.status, "value") else str(order.status),
         }
         self.entry.position_aggregate.update_from_order(order_data)
+        self._sync_combination_execution_state()
         self.entry._publish_domain_events()
         self.entry._reconcile_subscriptions("on_order")
 
@@ -60,6 +61,7 @@ class EventBridge:
             "datetime": trade.datetime,
         }
         self.entry.position_aggregate.update_from_trade(trade_data)
+        self._sync_combination_execution_state()
         self.entry._publish_domain_events()
         self.entry._reconcile_subscriptions("on_trade")
 
@@ -80,8 +82,16 @@ class EventBridge:
             "pnl": position.pnl,
         }
         self.entry.position_aggregate.update_from_position(position_data)
+        self._sync_combination_execution_state()
         self.entry._publish_domain_events()
         self.entry._reconcile_subscriptions("on_position")
+
+    def _sync_combination_execution_state(self) -> None:
+        if not self.entry.position_aggregate or not self.entry.combination_aggregate:
+            return
+        self.entry.combination_aggregate.sync_execution_states(
+            self.entry.position_aggregate.get_all_execution_states()
+        )
 
     def publish_domain_events(self) -> None:
         """弹出领域事件并发布策略告警事件。"""
@@ -143,6 +153,7 @@ class EventBridge:
         self.entry.combination_aggregate.sync_combination_status(
             vt_symbol=domain_event.vt_symbol,
             closed_vt_symbols=closed_vt_symbols,
+            position_execution_states=self.entry.position_aggregate.get_all_execution_states(),
         )
 
         combination_events = self.entry.combination_aggregate.pop_domain_events()

@@ -330,6 +330,12 @@ class LifecycleWorkflow:
 
             self._sync_live_oms_snapshot()
 
+            restore_hooks = tuple(
+                getattr(getattr(self.entry.runtime, "state", None), "restore_hooks", ()) or ()
+            )
+            for hook in restore_hooks:
+                hook(self.entry)
+
             try:
                 self.entry._validate_universe()
             except Exception:

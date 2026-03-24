@@ -15,6 +15,14 @@ Value Object Module
 """
 
 from .trading.order_instruction import OrderInstruction, Direction, Offset, OrderType
+from .trading.execution_state import (
+    CombinationExecutionState,
+    ExecutionAction,
+    ExecutionMode,
+    ExecutionPhase,
+    ExecutionPriority,
+    PositionExecutionState,
+)
 from .market import (
     AccountSnapshot,
     ContractParams,
@@ -63,6 +71,12 @@ __all__ = [
     "Direction",
     "Offset",
     "OrderType",
+    "ExecutionAction",
+    "ExecutionMode",
+    "ExecutionPhase",
+    "ExecutionPriority",
+    "PositionExecutionState",
+    "CombinationExecutionState",
     # 账户/持仓快照
     "AccountSnapshot",
     "PositionSnapshot",
