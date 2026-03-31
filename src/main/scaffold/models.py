@@ -54,7 +54,7 @@ class ConfigOverride:
 
 @dataclass(frozen=True)
 class CreateOptions:
-    """`optionforge create` 输入参数。"""
+    """Strategy spec / scaffold capability input parameters."""
 
     name: str | None
     destination: Path

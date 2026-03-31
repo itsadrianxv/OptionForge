@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.cli.common import CliEntryMetadata
-
 
 @dataclass(frozen=True)
 class StrategyMetadata:
@@ -16,10 +14,17 @@ class StrategyMetadata:
 
 
 @dataclass(frozen=True)
+class WorkflowSpec:
+    runtime_module: str
+    backtest_module: str
+    monitor_script: str
+
+
+@dataclass(frozen=True)
 class AcceptanceSpec:
     summary: str
     completion_checks: tuple[str, ...]
-    minimal_test_command: str
+    default_verification_profile: str
     test_selectors: tuple[str, ...]
     key_logs: tuple[str, ...]
     key_outputs: tuple[str, ...]
@@ -30,8 +35,7 @@ class FocusManifest:
     manifest_path: Path
     strategy: StrategyMetadata
     packs: tuple[str, ...]
-    cli: CliEntryMetadata
-    entrypoints: dict[str, str]
+    workflow: WorkflowSpec
     editable_paths: tuple[str, ...]
     reference_paths: tuple[str, ...]
     frozen_paths: tuple[str, ...]
@@ -46,9 +50,7 @@ class PackDefinition:
     owned_paths: tuple[str, ...]
     config_keys: tuple[str, ...]
     test_selectors: tuple[str, ...]
-    cli_commands: tuple[str, ...]
-    shell_commands: tuple[str, ...]
-    commands: tuple[str, ...]
+    workflow_refs: tuple[str, ...]
     agent_notes: tuple[str, ...]
 
 
@@ -97,8 +99,8 @@ class FocusContext:
         return self.nav_dir / "TASK_BRIEF.md"
 
     @property
-    def commands_path(self) -> Path:
-        return self.nav_dir / "COMMANDS.md"
+    def workflows_path(self) -> Path:
+        return self.nav_dir / "WORKFLOWS.md"
 
     @property
     def task_router_path(self) -> Path:

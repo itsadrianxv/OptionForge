@@ -7,10 +7,7 @@ owned_paths = [
 ]
 config_keys = []
 test_selectors = []
-cli_commands = []
-shell_commands = [
-  "docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build",
-]
+workflow_refs = ["deployment"]
 agent_notes = [
   "Use when: the task changes container setup, database integration, or multi-service startup.",
   "Read first: deploy/docker-compose.yml, deploy/.env.example, and deploy/Dockerfile.",

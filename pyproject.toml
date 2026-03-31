@@ -10,9 +10,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
-keywords = ["options", "trading", "backtesting", "cli", "vnpy"]
+keywords = ["options", "trading", "backtesting", "vnpy"]
 classifiers = [
-    "Environment :: Console",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -22,9 +21,6 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/maroonxv/OptionForge"
 Repository = "https://github.com/maroonxv/OptionForge"
-
-[project.scripts]
-optionforge = "src.cli.app:app"
 
 [tool.setuptools.dynamic]
 version = { attr = "src.__version__" }

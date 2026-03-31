@@ -162,7 +162,7 @@ _CONFIG_PARAM_SCHEMAS: tuple[ConfigParamSchema, ...] = (
         section_label="运行时配置",
         value_type=ConfigValueType.CHOICE,
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
-        description="CLI 与运行时日志输出级别。",
+        description="运行时日志输出级别。",
     ),
     ConfigParamSchema(
         key="runtime.log_dir",

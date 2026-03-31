@@ -3,7 +3,7 @@ depends_on = ["kernel"]
 owned_paths = [
   "src/strategy/domain/domain_service/selection",
   "config/domain_service/selection",
-  "tests/strategy/domain/domain_service/test_selection_integration.py",
+  "tests/strategy/runtime/test_provider_universe.py",
 ]
 config_keys = [
   "service_activation.future_selection",
@@ -11,12 +11,9 @@ config_keys = [
   "service_activation.option_selector",
 ]
 test_selectors = [
-  "tests/strategy/domain/domain_service/test_selection_integration.py",
+  "tests/strategy/runtime/test_provider_universe.py",
 ]
-cli_commands = [
-  "validate --config config/strategy_config.toml",
-]
-shell_commands = []
+workflow_refs = ["validation"]
 agent_notes = [
   "Use when: the task changes underlying selection, option-chain handling, or contract candidate rules.",
   "Read first: src/strategy/domain/domain_service/selection and config/domain_service/selection.",

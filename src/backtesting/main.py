@@ -13,13 +13,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--slippage", type=float, default=None, help="滑点")
     parser.add_argument("--size", type=int, default=None, help="合约乘数")
     parser.add_argument("--pricetick", type=float, default=None, help="最小价格变动")
-    parser.add_argument(
-        "--no-chart",
-        action="store_true",
-        default=None,
-        dest="no_chart",
-        help="不显示图表",
-    )
+    parser.add_argument("--no-chart", action="store_true", default=None, dest="no_chart", help="不显示图表")
     return parser
 
 

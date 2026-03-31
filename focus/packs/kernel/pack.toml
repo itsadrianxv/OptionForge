@@ -10,23 +10,21 @@ owned_paths = [
   "src/strategy/infrastructure/subscription",
   "src/strategy/infrastructure/utils",
   "src/main/main.py",
+  "src/main/validation",
   "src/main/bootstrap",
   "src/main/config",
   "src/main/process",
   "src/main/utils",
-  "src/cli",
   "config/strategy_config.toml",
   "config/general/trading_target.toml",
   "config/logging/logging.toml",
   "config/subscription/subscription.toml",
   "config/timeframe",
   "tests/strategy/application",
-  "tests/strategy/domain/entity",
-  "tests/strategy/domain/value_object",
-  "tests/strategy/infrastructure/bar_pipeline",
-  "tests/strategy/infrastructure/subscription",
-  "tests/strategy/infrastructure/utils",
-  "tests/cli/test_app.py",
+  "tests/strategy/domain",
+  "tests/strategy/runtime",
+  "tests/main/focus/test_agent_assets.py",
+  "tests/main/validation/test_service.py",
 ]
 config_keys = [
   "strategies",
@@ -37,16 +35,11 @@ config_keys = [
 ]
 test_selectors = [
   "tests/strategy/application/test_market_workflow_pipeline.py",
-  "tests/strategy/infrastructure/bar_pipeline/test_bar_pipeline.py",
-  "tests/strategy/infrastructure/subscription/test_subscription_mode_engine.py",
-  "tests/strategy/infrastructure/utils/test_date_calculator.py",
-  "tests/cli/test_app.py",
+  "tests/strategy/runtime/test_builder.py",
+  "tests/main/focus/test_agent_assets.py",
+  "tests/main/validation/test_service.py",
 ]
-cli_commands = [
-  "validate --config config/strategy_config.toml",
-  "run --config config/strategy_config.toml --paper",
-]
-shell_commands = []
+workflow_refs = ["validation", "runtime", "focus.smoke"]
 agent_notes = [
   "Use when: every strategy task depends on the kernel pack.",
   "Read first: focus manifest, config/strategy_config.toml, src/strategy/strategy_entry.py.",

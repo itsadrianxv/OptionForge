@@ -19,20 +19,25 @@
     "deploy",
     "backtest"
   ],
-  "cli": {
-    "primary": "python -m src.cli.app",
-    "installed_alias": "optionforge",
-    "cwd": "repo-root"
+  "workflows": {
+    "runtime_module": "src.main.main",
+    "backtest_module": "src.backtesting.main",
+    "monitor_script": "src/web/app.py",
+    "workflow_refs": [
+      "validation",
+      "runtime",
+      "backtest",
+      "monitoring",
+      "focus.smoke",
+      "focus.full",
+      "deployment"
+    ],
+    "default_verification_profile": "focus.smoke",
+    "expanded_verification_profile": "focus.full"
   },
   "recommended_first_pass": {
     "pack": "selection",
     "entry": "src/strategy/domain/domain_service/selection"
-  },
-  "entrypoints": {
-    "run": "python -m src.cli.app run --config config/strategy_config.toml --paper",
-    "backtest": "python -m src.cli.app backtest --config config/strategy_config.toml --start 2025-01-01 --end 2025-03-01 --no-chart",
-    "validate": "python -m src.cli.app validate --config config/strategy_config.toml",
-    "monitor": "python src/web/app.py"
   },
   "surfaces": {
     "editable": [
@@ -47,23 +52,21 @@
     ],
     "reference": [
       "src/main",
+      "src/main/validation",
       "src/backtesting",
       "src/web",
-      "src/cli",
       "src/main/scaffold",
-      "tests/backtesting",
+      "tests/strategy/application",
       "tests/main/scaffold",
+      "tests/main/validation",
       "deploy",
-      "doc",
+      "docs",
       "README.md"
     ],
     "frozen": [
       ".codex",
       ".git",
-      ".venv",
       ".pytest_cache",
-      ".hypothesis",
-      "temp",
       "LICENSE"
     ]
   },
@@ -74,58 +77,57 @@
   "test_matrix": {
     "smoke_selectors": [
       "tests/main/focus",
-      "tests/cli/test_app.py",
+      "tests/main/validation",
+      "tests/main/scaffold",
       "tests/strategy/application/test_market_workflow_pipeline.py",
-      "tests/strategy/infrastructure/bar_pipeline/test_bar_pipeline.py",
-      "tests/strategy/infrastructure/subscription/test_subscription_mode_engine.py",
-      "tests/strategy/infrastructure/utils/test_date_calculator.py",
-      "tests/strategy/domain/domain_service/test_selection_integration.py",
-      "tests/strategy/domain/domain_service/test_pricing_engine.py",
-      "tests/strategy/domain/domain_service/risk/test_risk_integration.py",
-      "tests/strategy/domain/domain_service/combination/test_combination_integration.py",
-      "tests/strategy/domain/domain_service/test_execution_integration.py",
-      "tests/strategy/domain/domain_service/test_delta_hedging_service.py",
-      "tests/strategy/domain/domain_service/test_vega_hedging_service.py",
-      "tests/strategy/infrastructure/monitoring/test_strategy_monitor_serialization.py",
-      "tests/strategy/infrastructure/persistence/test_state_repository.py",
-      "tests/web/test_monitor_template.py",
-      "tests/web/test_strategy_state_reader.py",
-      "tests/backtesting/test_cli.py",
-      "tests/backtesting/test_runner.py"
+      "tests/strategy/runtime/test_builder.py",
+      "tests/main/focus/test_agent_assets.py",
+      "tests/main/validation/test_service.py",
+      "tests/strategy/runtime/test_provider_universe.py",
+      "tests/strategy/runtime/test_provider_decision_pipeline.py",
+      "tests/strategy/domain/test_position_execution_state_machine.py",
+      "tests/strategy/domain/test_combination_execution_state_machine.py",
+      "tests/strategy/application/test_execution_state_hooks.py",
+      "tests/strategy/runtime/test_provider_execution_and_hedging.py",
+      "tests/strategy/runtime/test_provider_observability.py",
+      "tests/web/test_monitor_logging.py"
     ],
     "full_selectors": [
       "tests/main/focus",
-      "tests/cli/test_app.py",
+      "tests/main/validation",
+      "tests/main/scaffold",
       "tests/strategy/application/test_market_workflow_pipeline.py",
-      "tests/strategy/infrastructure/bar_pipeline/test_bar_pipeline.py",
-      "tests/strategy/infrastructure/subscription/test_subscription_mode_engine.py",
-      "tests/strategy/infrastructure/utils/test_date_calculator.py",
-      "tests/strategy/domain/domain_service/test_selection_integration.py",
-      "tests/strategy/domain/domain_service/test_pricing_engine.py",
-      "tests/strategy/domain/domain_service/risk/test_risk_integration.py",
-      "tests/strategy/domain/domain_service/combination/test_combination_integration.py",
-      "tests/strategy/domain/domain_service/test_execution_integration.py",
-      "tests/strategy/domain/domain_service/test_delta_hedging_service.py",
-      "tests/strategy/domain/domain_service/test_vega_hedging_service.py",
-      "tests/strategy/infrastructure/monitoring/test_strategy_monitor_serialization.py",
-      "tests/strategy/infrastructure/persistence/test_state_repository.py",
-      "tests/web/test_monitor_template.py",
-      "tests/web/test_strategy_state_reader.py",
-      "tests/backtesting/test_cli.py",
-      "tests/backtesting/test_runner.py"
+      "tests/strategy/runtime/test_builder.py",
+      "tests/main/focus/test_agent_assets.py",
+      "tests/main/validation/test_service.py",
+      "tests/strategy/runtime/test_provider_universe.py",
+      "tests/strategy/runtime/test_provider_decision_pipeline.py",
+      "tests/strategy/domain/test_position_execution_state_machine.py",
+      "tests/strategy/domain/test_combination_execution_state_machine.py",
+      "tests/strategy/application/test_execution_state_hooks.py",
+      "tests/strategy/runtime/test_provider_execution_and_hedging.py",
+      "tests/strategy/runtime/test_provider_observability.py",
+      "tests/web/test_monitor_logging.py"
     ],
     "smoke_keyword_expression": "not property and not pbt",
     "smoke_filter_descriptions": [
       "Exclude test nodes whose names contain `property`.",
       "Exclude test nodes whose names contain `pbt`."
     ],
-    "skipped_packs": []
+    "skipped_packs": [
+      {
+        "pack_key": "backtest",
+        "missing_modules": [
+          "chinese_calendar"
+        ]
+      }
+    ]
   },
   "generated_docs": {
     "system_map": ".focus/SYSTEM_MAP.md",
     "active_surface": ".focus/ACTIVE_SURFACE.md",
     "task_brief": ".focus/TASK_BRIEF.md",
-    "commands": ".focus/COMMANDS.md",
+    "workflows": ".focus/WORKFLOWS.md",
     "task_router": ".focus/TASK_ROUTER.md",
     "test_matrix": ".focus/TEST_MATRIX.md",
     "context_json": ".focus/context.json"
@@ -137,24 +139,25 @@
       "Validation command succeeds for the current strategy configuration.",
       "Focus smoke tests pass for the current strategy."
     ],
-    "minimal_test_command": "python -m src.cli.app focus test",
+    "default_verification_profile": "focus.smoke",
     "test_selectors": [
       "tests/main/focus",
-      "tests/cli/test_app.py"
+      "tests/main/validation",
+      "tests/main/scaffold"
     ],
     "key_logs": [
       "Validation passed",
-      "Doctor completed",
       "Focus assets refreshed"
     ],
     "key_outputs": [
       ".focus/SYSTEM_MAP.md",
       ".focus/ACTIVE_SURFACE.md",
       ".focus/TASK_BRIEF.md",
-      ".focus/COMMANDS.md",
+      ".focus/WORKFLOWS.md",
       ".focus/TASK_ROUTER.md",
       ".focus/TEST_MATRIX.md",
-      ".focus/context.json"
+      ".focus/context.json",
+      "tests/TEST.md"
     ]
   }
 }

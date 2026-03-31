@@ -8,13 +8,9 @@ config_keys = [
   "runtime.log_dir",
 ]
 test_selectors = [
-  "tests/web/test_monitor_template.py",
-  "tests/web/test_strategy_state_reader.py",
+  "tests/web/test_monitor_logging.py",
 ]
-cli_commands = []
-shell_commands = [
-  "python src/web/app.py",
-]
+workflow_refs = ["monitoring"]
 agent_notes = [
   "Use when: the task changes the monitoring UI, state readers, or frontend presentation.",
   "Read first: src/web and tests/web.",

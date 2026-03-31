@@ -3,8 +3,7 @@ depends_on = ["kernel", "risk", "execution"]
 owned_paths = [
   "src/strategy/domain/domain_service/hedging",
   "config/strategy_config.toml",
-  "tests/strategy/domain/domain_service/test_delta_hedging_service.py",
-  "tests/strategy/domain/domain_service/test_vega_hedging_service.py",
+  "tests/strategy/runtime/test_provider_execution_and_hedging.py",
 ]
 config_keys = [
   "service_activation.delta_hedging",
@@ -12,13 +11,9 @@ config_keys = [
   "hedging",
 ]
 test_selectors = [
-  "tests/strategy/domain/domain_service/test_delta_hedging_service.py",
-  "tests/strategy/domain/domain_service/test_vega_hedging_service.py",
+  "tests/strategy/runtime/test_provider_execution_and_hedging.py",
 ]
-cli_commands = [
-  "run --config config/strategy_config.toml --paper",
-]
-shell_commands = []
+workflow_refs = ["runtime"]
 agent_notes = [
   "Use when: the task changes Delta hedging, Vega hedging, or hedging thresholds.",
   "Read first: src/strategy/domain/domain_service/hedging and the hedging section in config/strategy_config.toml.",

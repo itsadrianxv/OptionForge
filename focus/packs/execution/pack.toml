@@ -3,9 +3,7 @@ depends_on = ["kernel", "risk"]
 owned_paths = [
   "src/strategy/domain/domain_service/execution",
   "config/domain_service/execution",
-  "tests/strategy/domain/domain_service/test_execution_config_properties.py",
-  "tests/strategy/domain/domain_service/test_execution_coordinator_properties.py",
-  "tests/strategy/domain/domain_service/test_execution_integration.py",
+  "tests/strategy/application/test_execution_state_hooks.py",
 ]
 config_keys = [
   "service_activation.smart_order_executor",
@@ -14,12 +12,9 @@ config_keys = [
   "advanced_orders",
 ]
 test_selectors = [
-  "tests/strategy/domain/domain_service/test_execution_integration.py",
+  "tests/strategy/application/test_execution_state_hooks.py",
 ]
-cli_commands = [
-  "run --config config/strategy_config.toml --paper",
-]
-shell_commands = []
+workflow_refs = ["runtime"]
 agent_notes = [
   "Use when: the task changes smart order execution, scheduling, or execution control details.",
   "Read first: src/strategy/domain/domain_service/execution and config/domain_service/execution.",

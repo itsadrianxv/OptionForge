@@ -14,22 +14,20 @@
 ## Reference Surface
 
 - `src/main`
+- `src/main/validation`
 - `src/backtesting`
 - `src/web`
-- `src/cli`
 - `src/main/scaffold`
-- `tests/backtesting`
+- `tests/strategy/application`
 - `tests/main/scaffold`
+- `tests/main/validation`
 - `deploy`
-- `doc`
+- `docs`
 - `README.md`
 
 ## Frozen Surface
 
 - `.codex`
 - `.git`
-- `.venv`
 - `.pytest_cache`
-- `.hypothesis`
-- `temp`
 - `LICENSE`

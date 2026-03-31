@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from src.cli.common import render_cli_command
-
 from .models import FocusContext, FocusTestMatrix, PackDefinition
 
 PACK_TASK_LABELS: dict[str, str] = {
@@ -127,10 +125,10 @@ def _render_pack(pack: PackDefinition) -> list[str]:
         f"- Config keys: {config_keys}",
         "- Owned paths:",
         *_render_paths(pack.owned_paths),
-        "- Common commands:",
+        "- Workflow refs:",
     ]
-    if pack.commands:
-        lines.extend(f"  - `{item}`" for item in pack.commands)
+    if pack.workflow_refs:
+        lines.extend(f"  - `{item}`" for item in pack.workflow_refs)
     else:
         lines.append("  - none")
     lines.append("- Agent notes:")
@@ -166,13 +164,12 @@ def render_system_map(context: FocusContext) -> str:
         "",
         "## Runtime Chain",
         "",
-        f"1. Source-checkout default: `{context.manifest.cli.primary}`.",
-        f"2. Installed alias: `{context.manifest.cli.installed_alias}`.",
-        f"3. Run CLI commands from `{context.manifest.cli.cwd}`.",
-        "4. `src/cli/app.py` routes commands to `forge`, `focus`, `run`, `backtest`, `validate`, and supporting commands.",
-        "5. `src/main/main.py` orchestrates runtime startup.",
-        "6. `src/strategy/strategy_entry.py` connects application, domain, and infrastructure layers.",
-        "7. Enabled packs extend the runtime with domain logic, monitoring, backtest, web, and deploy capabilities.",
+        f"1. Runtime module: `{context.manifest.workflow.runtime_module}`.",
+        f"2. Backtest module: `{context.manifest.workflow.backtest_module}`.",
+        f"3. Monitor script: `{context.manifest.workflow.monitor_script}`.",
+        "4. `src/main/main.py` orchestrates runtime startup.",
+        "5. `src/strategy/strategy_entry.py` connects application, domain, and infrastructure layers.",
+        "6. Enabled packs extend the runtime with domain logic, monitoring, backtest, web, and deploy capabilities.",
         "",
         "## Pack Notes",
         "",
@@ -225,7 +222,7 @@ def render_task_brief(context: FocusContext) -> str:
         "## Acceptance",
         "",
         f"- Summary: {context.manifest.acceptance.summary}",
-        f"- Minimal verification command: `{context.manifest.acceptance.minimal_test_command}`",
+        f"- Default verification profile: `{context.manifest.acceptance.default_verification_profile}`",
         *[f"- {item}" for item in context.manifest.acceptance.completion_checks],
         "",
         "## Key Logs And Outputs",
@@ -245,8 +242,8 @@ def render_task_router(
     context: FocusContext,
     test_matrix: FocusTestMatrix,
     *,
-    smoke_test_command: str,
-    full_test_command: str,
+    smoke_profile: str,
+    full_profile: str,
 ) -> str:
     del test_matrix
     lines = [
@@ -255,7 +252,7 @@ def render_task_router(
         "## How To Use This File",
         "",
         "- Match the task to the closest pack first, then start from the recommended entrypoint.",
-        f"- Default verification order: `{smoke_test_command}` first, then `{full_test_command}` only when needed.",
+        f"- Default verification order: `{smoke_profile}` first, then `{full_profile}` only when needed.",
         "- If the current focus is wide, start from one pack instead of scanning the full editable surface.",
         "",
     ]
@@ -278,12 +275,12 @@ def render_task_router(
                 *_render_paths(config_paths, indent="  "),
                 f"  - Config keys: {config_keys}",
                 "- Recommended verification:",
-                f"  - Smoke: `{smoke_test_command}`",
+                f"  - Default profile: `{smoke_profile}`",
                 "  - Relevant selectors:",
                 *_render_paths(pack.test_selectors, indent="    "),
-                f"  - Full: `{full_test_command}`",
-                "- Common commands:",
-                *_render_paths(pack.commands, indent="  "),
+                f"  - Expanded profile: `{full_profile}`",
+                "- Workflow refs:",
+                *_render_paths(pack.workflow_refs, indent="  "),
                 "- Common mistakes:",
                 *_render_text_items(common_mistakes, indent="  "),
                 "- Agent notes:",
@@ -300,15 +297,15 @@ def render_test_matrix(
     context: FocusContext,
     test_matrix: FocusTestMatrix,
     *,
-    smoke_test_command: str,
-    full_test_command: str,
+    smoke_profile: str,
+    full_profile: str,
 ) -> str:
     lines = [
         "# TEST MATRIX",
         "",
         "## Smoke",
         "",
-        f"- Command: `{smoke_test_command}`",
+        f"- Verification profile: `{smoke_profile}`",
         "- Notes: smoke uses the same selectors as full mode, plus keyword filters.",
         "- Selectors:",
         *_render_paths(test_matrix.smoke_selectors, indent="  "),
@@ -317,7 +314,7 @@ def render_test_matrix(
         "",
         "## Full",
         "",
-        f"- Command: `{full_test_command}`",
+        f"- Verification profile: `{full_profile}`",
         "- Selectors:",
         *_render_paths(test_matrix.full_selectors, indent="  "),
         "",
@@ -335,31 +332,26 @@ def render_test_matrix(
     return "\n".join(lines) + "\n"
 
 
-def render_commands(
+def render_workflows(
     context: FocusContext,
-    commands: tuple[str, ...],
+    workflow_refs: tuple[str, ...],
     *,
-    smoke_test_command: str,
-    full_test_command: str,
+    smoke_profile: str,
+    full_profile: str,
 ) -> str:
     lines = [
-        "# COMMANDS",
+        "# WORKFLOWS",
         "",
-        "## Focus Commands",
+        "## Core Workflows",
         "",
-        f"- `{render_cli_command('forge', metadata=context.manifest.cli)}`",
-        f"- `{render_cli_command('focus show', metadata=context.manifest.cli)}`",
-        f"- `{render_cli_command('focus refresh', metadata=context.manifest.cli)}`",
-        f"- `{smoke_test_command}`",
-        f"- `{full_test_command}`",
+        f"- Runtime module: `{context.manifest.workflow.runtime_module}`",
+        f"- Backtest module: `{context.manifest.workflow.backtest_module}`",
+        f"- Monitor script: `{context.manifest.workflow.monitor_script}`",
+        f"- Default verification profile: `{smoke_profile}`",
+        f"- Expanded verification profile: `{full_profile}`",
         "",
-        "## Verification Modes",
+        "## Current Focus Workflow Refs",
         "",
-        "- `smoke`: excludes test nodes with `property` or `pbt` in the name.",
-        "- `full`: runs the complete runnable selector set for the current focus.",
-        "",
-        "## Current Strategy Commands",
-        "",
-        *[f"- `{item}`" for item in commands],
+        *[f"- `{item}`" for item in workflow_refs],
     ]
     return "\n".join(lines) + "\n"

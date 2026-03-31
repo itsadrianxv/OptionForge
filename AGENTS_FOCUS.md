@@ -1,184 +1,85 @@
 # AGENTS_FOCUS.md
 
-This is the canonical operating manual for coding agents working in this repository.
+This document defines the current agent-first workflow for this repository.
 
-It does not replace `AGENTS.md`. `AGENTS.md` remains the repository policy file for commit behavior, refactoring constraints, and other project-wide rules. This file defines how an AGENT should inspect context, choose commands, edit safely, and verify work.
+It does not replace `AGENTS.md`. `AGENTS.md` remains the policy file for worktrees, merge rules, deployment verification, and cleanup.
 
-## Purpose And Audience
+## Default Workflow
 
-Use this document when you are:
+The default loop is:
 
-- a coding agent editing code in this repository
-- a developer supervising or reviewing AGENT-driven changes
-- a maintainer updating the AGENT workflow, generated navigation assets, or verification flow
+1. Read `strategy_spec.toml`.
+2. Read `.focus/context.json`.
+3. Stay inside the editable surface unless there is a concrete reason to expand.
+4. Refresh generated focus assets when workflow intent, pack scope, or shared navigation changes.
+5. Run verification in this order:
+   - `focus.smoke`
+   - `focus.full` only when the smoke profile is insufficient
+   - runtime or backtest workflows only when the task truly needs execution evidence
 
-The goal is to keep all AGENT-facing guidance aligned around one workflow and one source-of-truth hierarchy.
+The repository no longer relies on an installable command-line wrapper. Treat the focus manifest and generated assets as the source for module-level runtime and verification entrypoints.
 
-## Canonical Workflow
+## Source Of Truth
 
-The default AGENT workflow is:
-
-From a source checkout, execute commands from the repository root with `python -m src.cli.app ...`.
-If the package is installed into the active environment, the equivalent short alias is `optionforge ...`.
-
-1. Run `python -m src.cli.app forge` when you need to create or refresh AGENT assets.
-2. Inspect `strategy_spec.toml` and `.focus/context.json`.
-3. Edit only files inside the current editable surface.
-4. Run `python -m src.cli.app validate --json`.
-5. Run `python -m src.cli.app focus test --json`.
-6. Run `python -m src.cli.app backtest --json` only when strategy behavior needs execution evidence.
-7. Run `python -m src.cli.app run --json` only for runtime workflows, not as the default edit-validation loop.
-
-If a task is local and small, the shortest safe loop is:
-
-```powershell
-python -m src.cli.app validate --json
-python -m src.cli.app focus test --json
-```
-
-If the task changes workflow intent, focus scope, or AGENT assets, start with:
-
-```powershell
-python -m src.cli.app forge --json
-```
-
-## Source Of Truth Hierarchy
-
-Read these assets in this order:
+Use these assets in order:
 
 1. `strategy_spec.toml`
-   - high-level strategy intent
-   - scaffold preset, enabled capabilities, and acceptance expectations
 2. `.focus/context.json`
-   - the machine-readable current-context contract
-   - preferred input for AGENT navigation and automation
-3. `.focus/*.md`
-   - human-readable navigation companions
-   - use when you need explanation or a reading path, not as the primary machine interface
-4. `tests/TEST.md`
-   - test plan plus the latest acceptance summary
-5. `artifacts/validate/latest.json` and `artifacts/backtest/latest.json`
-   - latest structured command results
+3. `.focus/SYSTEM_MAP.md`
+4. `.focus/TASK_BRIEF.md`
+5. `.focus/WORKFLOWS.md`
+6. `.focus/TASK_ROUTER.md`
+7. `.focus/TEST_MATRIX.md`
+8. `tests/TEST.md`
+9. `artifacts/validation/latest.json`
 
-If these sources disagree:
-
-- treat `AGENTS_FOCUS.md` as the canonical human policy
-- treat `strategy_spec.toml` as the canonical intent spec
-- treat `.focus/context.json` as the canonical current-context contract
-- update the generators and regenerate assets instead of hand-maintaining drift
+If generated assets drift from the spec, update the generator/source layer and refresh the agent assets instead of hand-maintaining the generated files.
 
 ## Editing Boundaries
 
-Always classify paths before editing:
-
 - `editable`
   - default edit surface
-  - AGENT should stay here unless there is a concrete reason to expand scope
 - `reference`
-  - read for context, dependency tracing, and interface understanding
-  - avoid editing unless the task truly requires it
+  - context only unless the task truly requires expansion
 - `frozen`
-  - do not edit unless the task explicitly targets generator or repository-policy behavior
+  - do not edit unless the task is explicitly about repository policy or asset generation
 
-Default rule:
+When you must expand scope:
 
-- consume `.focus/context.json` first
-- do not start with ad hoc repo traversal
-- do not scan large directories “just in case” before checking the current focus contract
+1. Explain why the editable surface is insufficient.
+2. Expand by the smallest possible step.
+3. Record the expansion in the delivery summary.
 
-If you must go beyond the editable surface:
+## Verification Profiles
 
-1. confirm the change cannot be completed inside the current editable surface
-2. expand scope by the smallest possible step
-3. explain the boundary expansion in the delivery summary
+- `focus.smoke`
+  - default verification profile
+  - runs the current focus selectors with the smoke keyword filter
+- `focus.full`
+  - full runnable selector set for the current focus
+- `runtime`
+  - use only for runtime lifecycle or monitoring work
+- `backtest`
+  - use only when behavior or parameter effects need execution evidence
 
-## Command Protocol
-
-Prefer structured output by default.
-
-### Single-response commands
-
-Use `--json` and consume the standard JSON envelope:
-
-- `python -m src.cli.app forge --json`
-- `python -m src.cli.app focus show --json`
-- `python -m src.cli.app validate --json`
-- `python -m src.cli.app doctor --json`
-- `python -m src.cli.app examples --json`
-
-### Long-running commands
-
-Use `--json` and consume NDJSON event streams:
-
-- `python -m src.cli.app run --json`
-- `python -m src.cli.app backtest --json`
-
-The AGENT default should be:
-
-- prefer `--json` whenever it is available
-- use plain-text output only for human-only workflows or local debugging
-
-## Verification Rules
-
-Use this default verification order:
-
-1. `python -m src.cli.app validate --json`
-2. `python -m src.cli.app focus test --json`
-3. `python -m src.cli.app backtest --json` only when behavior or parameter effects need execution evidence
-4. `python -m src.cli.app run --json` only when the task is about runtime lifecycle, monitoring, or long-lived execution
-
-Interpret the outputs from:
-
-- the command JSON itself
-- `tests/TEST.md`
-- `artifacts/validate/latest.json`
-- `artifacts/backtest/latest.json`
-
-Do not treat a code edit as complete just because the repo builds. Complete the structured verification loop.
-
-## Pack-Aware Editing
-
-Current focus packs define ownership, entrypoints, and tests.
-
-When working on a pack:
-
-- read the pack entry in `.focus/TASK_ROUTER.md`
-- follow `Read first` paths from the pack metadata
-- use the pack-owned test selectors before wider regression
-
-Do not re-centralize pack logic back into broad top-level entrypoints when the concrete domain service or infrastructure module already owns it.
+Structured evidence is written to `artifacts/validation/latest.json` and other refreshed asset files. Do not claim completion from code inspection alone.
 
 ## Anti-Patterns
 
 Do not:
 
-- bypass `strategy_spec.toml` when changing workflow intent or AGENT-facing assumptions
-- hand-edit generated `.focus/*` files unless the task is specifically about the generators
-- rely on plain-text CLI output when `--json` exists
-- widen scope beyond the editable surface without a concrete reason
-- duplicate strategy logic just for backtest or AGENT convenience when the main contract can be reused
-- introduce facade/coordinator layers for domain or infrastructure work unless the task explicitly requires them
+- bypass `strategy_spec.toml` when changing intent or pack scope
+- hand-edit generated `.focus/*` files unless the task is about the generator
+- widen scope without a concrete reason
+- reintroduce command-wrapper abstractions around runtime or verification flows
+- move domain or infrastructure responsibilities into generic coordinators
 
 ## Delivery Checklist
 
-Every AGENT delivery should state:
+Every delivery should state:
 
-1. which workflow entrypoint was used
-   - `forge`, `validate`, `focus test`, `backtest`, or `run`
-2. which source-of-truth assets were consulted
-   - at minimum `strategy_spec.toml` and `.focus/context.json` when relevant
-3. which surface was edited
-   - editable only, or why scope expanded
-4. which structured verification steps ran
-5. whether `tests/TEST.md` or `artifacts/*/latest.json` changed
-6. any remaining risks, skipped checks, or follow-up steps
-
-## Maintenance Rule
-
-If you change AGENT workflow wording or runtime navigation semantics, update the generator/source layer and then regenerate:
-
-```powershell
-python -m src.cli.app forge
-```
-
-Only commit generated AGENT assets after the generator/source changes that produce them are also included.
+1. which source-of-truth assets were consulted
+2. which surface was edited
+3. which verification profiles or execution workflows ran
+4. whether `tests/TEST.md` or `artifacts/*/latest.json` changed
+5. any remaining risks or skipped checks

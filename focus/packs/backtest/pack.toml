@@ -2,22 +2,20 @@ key = "backtest"
 depends_on = ["kernel", "selection"]
 owned_paths = [
   "src/backtesting",
-  "tests/backtesting",
+  "tests/strategy/application/test_lifecycle_runtime_builder.py",
+  "tests/strategy/application/test_execution_state_hooks.py",
 ]
 config_keys = [
   "strategies",
   "service_activation",
 ]
 test_selectors = [
-  "tests/backtesting/test_cli.py",
-  "tests/backtesting/test_runner.py",
+  "tests/strategy/application/test_lifecycle_runtime_builder.py",
+  "tests/strategy/application/test_execution_state_hooks.py",
 ]
-cli_commands = [
-  "backtest --config config/strategy_config.toml --start 2025-01-01 --end 2025-03-01 --no-chart",
-]
-shell_commands = []
+workflow_refs = ["backtest"]
 agent_notes = [
   "Use when: the task needs execution evidence for strategy logic, contract discovery, or parameter effects.",
-  "Read first: src/backtesting and tests/backtesting.",
+  "Read first: src/backtesting and tests/strategy/application.",
   "Common mistake: do not duplicate strategy logic just for backtest; reuse the main strategy contract and config.",
 ]

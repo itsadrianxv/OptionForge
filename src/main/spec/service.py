@@ -529,7 +529,8 @@ def build_test_plan_markdown(
             "",
             f"- validate: {validate_summary_text}",
             f"- focus test: {focus_test_summary_text}",
-            "- Default verification order: `validate --json` then `focus test --json`.",
+            "- Default verification profile: `focus.smoke`.",
+            "- Expanded verification profile: `focus.full`.",
             "",
         ]
     )

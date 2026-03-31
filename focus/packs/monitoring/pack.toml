@@ -3,8 +3,7 @@ depends_on = ["kernel"]
 owned_paths = [
   "src/strategy/infrastructure/monitoring",
   "src/strategy/infrastructure/persistence",
-  "tests/strategy/infrastructure/monitoring",
-  "tests/strategy/infrastructure/persistence",
+  "tests/strategy/runtime/test_provider_observability.py",
 ]
 config_keys = [
   "service_activation.monitoring",
@@ -12,13 +11,9 @@ config_keys = [
   "observability",
 ]
 test_selectors = [
-  "tests/strategy/infrastructure/monitoring/test_strategy_monitor_serialization.py",
-  "tests/strategy/infrastructure/persistence/test_state_repository.py",
+  "tests/strategy/runtime/test_provider_observability.py",
 ]
-cli_commands = [
-  "run --config config/strategy_config.toml --paper",
-]
-shell_commands = []
+workflow_refs = ["runtime", "monitoring"]
 agent_notes = [
   "Use when: the task changes monitoring, snapshots, persistence, or observability output.",
   "Read first: src/strategy/infrastructure/monitoring and src/strategy/infrastructure/persistence.",

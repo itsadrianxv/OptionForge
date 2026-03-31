@@ -19,13 +19,12 @@
 
 ## Runtime Chain
 
-1. Source-checkout default: `python -m src.cli.app`.
-2. Installed alias: `optionforge`.
-3. Run CLI commands from `repo-root`.
-4. `src/cli/app.py` routes commands to `forge`, `focus`, `run`, `backtest`, `validate`, and supporting commands.
-5. `src/main/main.py` orchestrates runtime startup.
-6. `src/strategy/strategy_entry.py` connects application, domain, and infrastructure layers.
-7. Enabled packs extend the runtime with domain logic, monitoring, backtest, web, and deploy capabilities.
+1. Runtime module: `src.main.main`.
+2. Backtest module: `src.backtesting.main`.
+3. Monitor script: `src/web/app.py`.
+4. `src/main/main.py` orchestrates runtime startup.
+5. `src/strategy/strategy_entry.py` connects application, domain, and infrastructure layers.
+6. Enabled packs extend the runtime with domain logic, monitoring, backtest, web, and deploy capabilities.
 
 ## Pack Notes
 
@@ -43,26 +42,25 @@
 - `src/strategy/infrastructure/subscription`
 - `src/strategy/infrastructure/utils`
 - `src/main/main.py`
+- `src/main/validation`
 - `src/main/bootstrap`
 - `src/main/config`
 - `src/main/process`
 - `src/main/utils`
-- `src/cli`
 - `config/strategy_config.toml`
 - `config/general/trading_target.toml`
 - `config/logging/logging.toml`
 - `config/subscription/subscription.toml`
 - `config/timeframe`
 - `tests/strategy/application`
-- `tests/strategy/domain/entity`
-- `tests/strategy/domain/value_object`
-- `tests/strategy/infrastructure/bar_pipeline`
-- `tests/strategy/infrastructure/subscription`
-- `tests/strategy/infrastructure/utils`
-- `tests/cli/test_app.py`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+- `tests/strategy/domain`
+- `tests/strategy/runtime`
+- `tests/main/focus/test_agent_assets.py`
+- `tests/main/validation/test_service.py`
+- Workflow refs:
+  - `validation`
+  - `runtime`
+  - `focus.smoke`
 - Agent notes:
   - Use when: every strategy task depends on the kernel pack.
   - Read first: focus manifest, config/strategy_config.toml, src/strategy/strategy_entry.py.
@@ -75,9 +73,9 @@
 - Owned paths:
 - `src/strategy/domain/domain_service/selection`
 - `config/domain_service/selection`
-- `tests/strategy/domain/domain_service/test_selection_integration.py`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
+- `tests/strategy/runtime/test_provider_universe.py`
+- Workflow refs:
+  - `validation`
 - Agent notes:
   - Use when: the task changes underlying selection, option-chain handling, or contract candidate rules.
   - Read first: src/strategy/domain/domain_service/selection and config/domain_service/selection.
@@ -90,12 +88,9 @@
 - Owned paths:
 - `src/strategy/domain/domain_service/pricing`
 - `config/domain_service/pricing`
-- `tests/strategy/domain/domain_service/test_pricing_engine.py`
-- `tests/strategy/domain/domain_service/test_pricing_engine_config_properties.py`
-- `tests/strategy/domain/domain_service/test_pricing_engine_properties.py`
-- `tests/strategy/domain/domain_service/test_pricing_properties.py`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
+- `tests/strategy/runtime/test_provider_decision_pipeline.py`
+- Workflow refs:
+  - `validation`
 - Agent notes:
   - Use when: the task changes pricing, implied volatility, or Greeks support.
   - Read first: src/strategy/domain/domain_service/pricing and config/domain_service/pricing.
@@ -109,10 +104,9 @@
 - `src/strategy/domain/domain_service/risk`
 - `src/strategy/domain/domain_service/combination`
 - `config/domain_service/risk`
-- `tests/strategy/domain/domain_service/risk`
-- `tests/strategy/domain/domain_service/combination`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
+- `tests/strategy/domain`
+- Workflow refs:
+  - `validation`
 - Agent notes:
   - Use when: the task changes position sizing, portfolio Greeks, stop logic, or risk budgets.
   - Read first: src/strategy/domain/domain_service/risk and src/strategy/domain/domain_service/combination.
@@ -125,11 +119,9 @@
 - Owned paths:
 - `src/strategy/domain/domain_service/execution`
 - `config/domain_service/execution`
-- `tests/strategy/domain/domain_service/test_execution_config_properties.py`
-- `tests/strategy/domain/domain_service/test_execution_coordinator_properties.py`
-- `tests/strategy/domain/domain_service/test_execution_integration.py`
-- Common commands:
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+- `tests/strategy/application/test_execution_state_hooks.py`
+- Workflow refs:
+  - `runtime`
 - Agent notes:
   - Use when: the task changes smart order execution, scheduling, or execution control details.
   - Read first: src/strategy/domain/domain_service/execution and config/domain_service/execution.
@@ -142,10 +134,9 @@
 - Owned paths:
 - `src/strategy/domain/domain_service/hedging`
 - `config/strategy_config.toml`
-- `tests/strategy/domain/domain_service/test_delta_hedging_service.py`
-- `tests/strategy/domain/domain_service/test_vega_hedging_service.py`
-- Common commands:
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+- `tests/strategy/runtime/test_provider_execution_and_hedging.py`
+- Workflow refs:
+  - `runtime`
 - Agent notes:
   - Use when: the task changes Delta hedging, Vega hedging, or hedging thresholds.
   - Read first: src/strategy/domain/domain_service/hedging and the hedging section in config/strategy_config.toml.
@@ -158,10 +149,10 @@
 - Owned paths:
 - `src/strategy/infrastructure/monitoring`
 - `src/strategy/infrastructure/persistence`
-- `tests/strategy/infrastructure/monitoring`
-- `tests/strategy/infrastructure/persistence`
-- Common commands:
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+- `tests/strategy/runtime/test_provider_observability.py`
+- Workflow refs:
+  - `runtime`
+  - `monitoring`
 - Agent notes:
   - Use when: the task changes monitoring, snapshots, persistence, or observability output.
   - Read first: src/strategy/infrastructure/monitoring and src/strategy/infrastructure/persistence.
@@ -174,8 +165,8 @@
 - Owned paths:
 - `src/web`
 - `tests/web`
-- Common commands:
-  - `python src/web/app.py`
+- Workflow refs:
+  - `monitoring`
 - Agent notes:
   - Use when: the task changes the monitoring UI, state readers, or frontend presentation.
   - Read first: src/web and tests/web.
@@ -189,8 +180,8 @@
 - `.dockerignore`
 - `.env.example`
 - `deploy`
-- Common commands:
-  - `docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build`
+- Workflow refs:
+  - `deployment`
 - Agent notes:
   - Use when: the task changes container setup, database integration, or multi-service startup.
   - Read first: deploy/docker-compose.yml, deploy/.env.example, and deploy/Dockerfile.
@@ -202,10 +193,11 @@
 - Config keys: `strategies`, `service_activation`
 - Owned paths:
 - `src/backtesting`
-- `tests/backtesting`
-- Common commands:
-  - `python -m src.cli.app backtest --config config/strategy_config.toml --start 2025-01-01 --end 2025-03-01 --no-chart`
+- `tests/strategy/application/test_lifecycle_runtime_builder.py`
+- `tests/strategy/application/test_execution_state_hooks.py`
+- Workflow refs:
+  - `backtest`
 - Agent notes:
   - Use when: the task needs execution evidence for strategy logic, contract discovery, or parameter effects.
-  - Read first: src/backtesting and tests/backtesting.
+  - Read first: src/backtesting and tests/strategy/application.
   - Common mistake: do not duplicate strategy logic just for backtest; reuse the main strategy contract and config.

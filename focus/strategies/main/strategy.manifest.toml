@@ -1,7 +1,7 @@
 packs = ["kernel", "selection", "pricing", "risk", "execution", "hedging", "monitoring", "web", "deploy", "backtest"]
 editable_paths = ["src/strategy/strategy_entry.py", "src/strategy/application", "src/strategy/domain", "config/strategy_config.toml", "config/general/trading_target.toml", "config/domain_service", "tests/strategy", "tests/web"]
-reference_paths = ["src/main", "src/backtesting", "src/web", "src/cli", "src/main/scaffold", "tests/backtesting", "tests/main/scaffold", "deploy", "doc", "README.md"]
-frozen_paths = [".codex", ".git", ".venv", ".pytest_cache", ".hypothesis", "temp", "LICENSE"]
+reference_paths = ["src/main", "src/main/validation", "src/backtesting", "src/web", "src/main/scaffold", "tests/strategy/application", "tests/main/scaffold", "tests/main/validation", "deploy", "docs", "README.md"]
+frozen_paths = [".codex", ".git", ".pytest_cache", "LICENSE"]
 
 [strategy]
 name = "main"
@@ -10,21 +10,15 @@ strategy_type = "custom"
 run_mode = "standalone"
 summary = "Agent-first strategy workspace for developing and iterating option strategies."
 
-[cli]
-primary = "python -m src.cli.app"
-installed_alias = "optionforge"
-cwd = "repo-root"
-
-[entrypoints]
-run = "python -m src.cli.app run --config config/strategy_config.toml --paper"
-backtest = "python -m src.cli.app backtest --config config/strategy_config.toml --start 2025-01-01 --end 2025-03-01 --no-chart"
-validate = "python -m src.cli.app validate --config config/strategy_config.toml"
-monitor = "python src/web/app.py"
+[workflow]
+runtime_module = "src.main.main"
+backtest_module = "src.backtesting.main"
+monitor_script = "src/web/app.py"
 
 [acceptance]
 summary = "Agent-first strategy workspace for developing and iterating option strategies."
 completion_checks = ["Focus navigation files are refreshed and point to the current manifest.", "Validation command succeeds for the current strategy configuration.", "Focus smoke tests pass for the current strategy."]
-minimal_test_command = "python -m src.cli.app focus test"
-test_selectors = ["tests/main/focus", "tests/cli/test_app.py"]
-key_logs = ["Validation passed", "Doctor completed", "Focus assets refreshed"]
-key_outputs = [".focus/SYSTEM_MAP.md", ".focus/ACTIVE_SURFACE.md", ".focus/TASK_BRIEF.md", ".focus/COMMANDS.md", ".focus/TASK_ROUTER.md", ".focus/TEST_MATRIX.md", ".focus/context.json"]
+default_verification_profile = "focus.smoke"
+test_selectors = ["tests/main/focus", "tests/main/validation", "tests/main/scaffold"]
+key_logs = ["Validation passed", "Focus assets refreshed"]
+key_outputs = [".focus/SYSTEM_MAP.md", ".focus/ACTIVE_SURFACE.md", ".focus/TASK_BRIEF.md", ".focus/WORKFLOWS.md", ".focus/TASK_ROUTER.md", ".focus/TEST_MATRIX.md", ".focus/context.json", "tests/TEST.md"]

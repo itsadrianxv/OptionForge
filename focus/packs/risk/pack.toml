@@ -4,8 +4,7 @@ owned_paths = [
   "src/strategy/domain/domain_service/risk",
   "src/strategy/domain/domain_service/combination",
   "config/domain_service/risk",
-  "tests/strategy/domain/domain_service/risk",
-  "tests/strategy/domain/domain_service/combination",
+  "tests/strategy/domain",
 ]
 config_keys = [
   "service_activation.position_sizing",
@@ -16,13 +15,10 @@ config_keys = [
   "combination_risk",
 ]
 test_selectors = [
-  "tests/strategy/domain/domain_service/risk/test_risk_integration.py",
-  "tests/strategy/domain/domain_service/combination/test_combination_integration.py",
+  "tests/strategy/domain/test_position_execution_state_machine.py",
+  "tests/strategy/domain/test_combination_execution_state_machine.py",
 ]
-cli_commands = [
-  "validate --config config/strategy_config.toml",
-]
-shell_commands = []
+workflow_refs = ["validation"]
 agent_notes = [
   "Use when: the task changes position sizing, portfolio Greeks, stop logic, or risk budgets.",
   "Read first: src/strategy/domain/domain_service/risk and src/strategy/domain/domain_service/combination.",

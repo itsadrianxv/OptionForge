@@ -3,7 +3,7 @@
 ## How To Use This File
 
 - Match the task to the closest pack first, then start from the recommended entrypoint.
-- Default verification order: `python -m src.cli.app focus test` first, then `python -m src.cli.app focus test --full` only when needed.
+- Default verification order: `focus.smoke` first, then `focus.full` only when needed.
 - If the current focus is wide, start from one pack instead of scanning the full editable surface.
 
 ### `kernel`
@@ -19,11 +19,11 @@
   - `src/strategy/infrastructure/subscription`
   - `src/strategy/infrastructure/utils`
   - `src/main/main.py`
+  - `src/main/validation`
   - `src/main/bootstrap`
   - `src/main/config`
   - `src/main/process`
   - `src/main/utils`
-  - `src/cli`
 - Related config:
   - `config/strategy_config.toml`
   - `config/general/trading_target.toml`
@@ -32,17 +32,17 @@
   - `config/timeframe`
   - Config keys: `strategies`, `strategy_contracts`, `service_activation`, `observability`, `runtime`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
     - `tests/strategy/application/test_market_workflow_pipeline.py`
-    - `tests/strategy/infrastructure/bar_pipeline/test_bar_pipeline.py`
-    - `tests/strategy/infrastructure/subscription/test_subscription_mode_engine.py`
-    - `tests/strategy/infrastructure/utils/test_date_calculator.py`
-    - `tests/cli/test_app.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+    - `tests/strategy/runtime/test_builder.py`
+    - `tests/main/focus/test_agent_assets.py`
+    - `tests/main/validation/test_service.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `validation`
+  - `runtime`
+  - `focus.smoke`
 - Common mistakes:
   - do not push pack-specific logic back into broad entrypoints; prefer editing the concrete service or infrastructure implementation.
 - Agent notes:
@@ -58,12 +58,12 @@
   - `config/domain_service/selection`
   - Config keys: `service_activation.future_selection`, `service_activation.option_chain`, `service_activation.option_selector`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/strategy/domain/domain_service/test_selection_integration.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
+    - `tests/strategy/runtime/test_provider_universe.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `validation`
 - Common mistakes:
   - do not hardcode selection logic into strategy_entry; keep it inside the selection service.
 - Agent notes:
@@ -79,12 +79,12 @@
   - `config/domain_service/pricing`
   - Config keys: `service_activation.pricing_engine`, `pricing_engine`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/strategy/domain/domain_service/test_pricing_engine.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
+    - `tests/strategy/runtime/test_provider_decision_pipeline.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `validation`
 - Common mistakes:
   - do not scatter pricing parameters across modules; keep them centralized in the pricing pack config.
 - Agent notes:
@@ -101,13 +101,13 @@
   - `config/domain_service/risk`
   - Config keys: `service_activation.position_sizing`, `service_activation.greeks_calculator`, `service_activation.portfolio_risk`, `position_sizing`, `greeks_risk`, `combination_risk`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/strategy/domain/domain_service/risk/test_risk_integration.py`
-    - `tests/strategy/domain/domain_service/combination/test_combination_integration.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app validate --config config/strategy_config.toml`
+    - `tests/strategy/domain/test_position_execution_state_machine.py`
+    - `tests/strategy/domain/test_combination_execution_state_machine.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `validation`
 - Common mistakes:
   - do not move risk decisions into CLI code or workflows; keep them inside concrete risk services.
 - Agent notes:
@@ -123,12 +123,12 @@
   - `config/domain_service/execution`
   - Config keys: `service_activation.smart_order_executor`, `service_activation.advanced_order_scheduler`, `order_execution`, `advanced_orders`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/strategy/domain/domain_service/test_execution_integration.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+    - `tests/strategy/application/test_execution_state_hooks.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `runtime`
 - Common mistakes:
   - do not add facade or coordinator layers here; edit the concrete execution service directly.
 - Agent notes:
@@ -144,13 +144,12 @@
   - `config/strategy_config.toml`
   - Config keys: `service_activation.delta_hedging`, `service_activation.vega_hedging`, `hedging`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/strategy/domain/domain_service/test_delta_hedging_service.py`
-    - `tests/strategy/domain/domain_service/test_vega_hedging_service.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+    - `tests/strategy/runtime/test_provider_execution_and_hedging.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `runtime`
 - Common mistakes:
   - do not scatter hedging thresholds through business code; keep them in config-driven hedging services.
 - Agent notes:
@@ -167,13 +166,13 @@
   - `config/strategy_config.toml`
   - Config keys: `service_activation.monitoring`, `service_activation.decision_observability`, `observability`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/strategy/infrastructure/monitoring/test_strategy_monitor_serialization.py`
-    - `tests/strategy/infrastructure/persistence/test_state_repository.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app run --config config/strategy_config.toml --paper`
+    - `tests/strategy/runtime/test_provider_observability.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `runtime`
+  - `monitoring`
 - Common mistakes:
   - do not push monitoring or storage details into domain services; keep them in infrastructure.
 - Agent notes:
@@ -189,13 +188,12 @@
   - `config/strategy_config.toml`
   - Config keys: `runtime.log_dir`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/web/test_monitor_template.py`
-    - `tests/web/test_strategy_state_reader.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python src/web/app.py`
+    - `tests/web/test_monitor_logging.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `monitoring`
 - Common mistakes:
   - do not move strategy decision logic into the web layer; web should stay read-only and presentational.
 - Agent notes:
@@ -213,12 +211,12 @@
   - `.env.example`
   - Config keys: none
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
     - none
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `deployment`
 - Common mistakes:
   - do not start with deploy changes for local strategy iteration; confirm the runtime path and focus assets first.
 - Agent notes:
@@ -234,15 +232,15 @@
   - `config/strategy_config.toml`
   - Config keys: `strategies`, `service_activation`
 - Recommended verification:
-  - Smoke: `python -m src.cli.app focus test`
+  - Default profile: `focus.smoke`
   - Relevant selectors:
-    - `tests/backtesting/test_cli.py`
-    - `tests/backtesting/test_runner.py`
-  - Full: `python -m src.cli.app focus test --full`
-- Common commands:
-  - `python -m src.cli.app backtest --config config/strategy_config.toml --start 2025-01-01 --end 2025-03-01 --no-chart`
+    - `tests/strategy/application/test_lifecycle_runtime_builder.py`
+    - `tests/strategy/application/test_execution_state_hooks.py`
+  - Expanded profile: `focus.full`
+- Workflow refs:
+  - `backtest`
 - Common mistakes:
   - do not duplicate strategy logic just for backtest; reuse the main strategy contract and config.
 - Agent notes:
   - Use when: the task needs execution evidence for strategy logic, contract discovery, or parameter effects.
-  - Read first: src/backtesting and tests/backtesting.
+  - Read first: src/backtesting and tests/strategy/application.

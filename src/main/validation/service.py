@@ -5,25 +5,18 @@ from datetime import date
 from pathlib import Path
 import sys
 
-import typer
-
 from src.backtesting.config import BacktestConfig
-from src.cli.common import (
+from src.main.config.config_loader import ConfigLoader
+from src.main.utils.workflow_support import (
     CheckResult,
-    EXIT_CODE_VALIDATION,
-    abort,
     build_artifact,
     build_error,
     display_path,
-    echo_check,
-    emit_single_json,
     ensure_project_root_on_path,
-    flag_enabled,
     resolve_project_path,
     utc_now_iso,
-    write_command_artifact,
+    write_verification_artifact,
 )
-from src.main.config.config_loader import ConfigLoader
 
 DEFAULT_INDICATOR_SERVICE = "src.strategy.domain.domain_service.signal.indicator_service:IndicatorService"
 DEFAULT_SIGNAL_SERVICE = "src.strategy.domain.domain_service.signal.signal_service:SignalService"
@@ -45,7 +38,7 @@ def _parse_iso_date(raw: str, label: str) -> tuple[date | None, CheckResult]:
     try:
         parsed = date.fromisoformat(raw)
     except ValueError:
-        return None, _error(label, f"日期格式必须是 YYYY-MM-DD，收到: {raw}")
+        return None, _error(label, f"日期格式必须是 YYYY-MM-DD，收到 {raw}")
 
     return parsed, _ok(label, raw)
 
@@ -59,7 +52,9 @@ def _validate_backtest_overrides(
     slippage: float | None,
     size: int | None,
     pricetick: float | None,
-    no_chart: str,
+    no_chart: bool,
+    *,
+    repo_root: Path | None = None,
 ) -> list[CheckResult]:
     results: list[CheckResult] = []
     start_date: date | None = None
@@ -86,7 +81,6 @@ def _validate_backtest_overrides(
         ("合约乘数", size, lambda value: value > 0, "必须大于 0"),
         ("最小价格变动", pricetick, lambda value: value > 0, "必须大于 0"),
     ]
-
     for title, value, predicate, message in numeric_checks:
         if value is None:
             continue
@@ -104,17 +98,17 @@ def _validate_backtest_overrides(
         slippage=slippage,
         size=size,
         pricetick=pricetick,
-        no_chart=flag_enabled(no_chart),
+        no_chart=no_chart,
     )
     backtest_config = BacktestConfig.from_args(args)
     results.append(
         _ok(
             "回测参数摘要",
             (
-                f"config={display_path(backtest_config.config_path)}, capital={backtest_config.capital}, "
-                f"rate={backtest_config.rate}, slippage={backtest_config.slippage}, "
-                f"size={backtest_config.default_size}, pricetick={backtest_config.default_pricetick}, "
-                f"show_chart={backtest_config.show_chart}"
+                f"config={display_path(backtest_config.config_path, repo_root=repo_root)}, "
+                f"capital={backtest_config.capital}, rate={backtest_config.rate}, "
+                f"slippage={backtest_config.slippage}, size={backtest_config.default_size}, "
+                f"pricetick={backtest_config.default_pricetick}, show_chart={backtest_config.show_chart}"
             ),
         )
     )
@@ -133,9 +127,9 @@ def collect_validation_results(
     slippage: float | None = None,
     size: int | None = None,
     pricetick: float | None = None,
-    no_chart: str = "",
+    no_chart: bool = False,
 ) -> tuple[list[CheckResult], dict[str, object], list[dict[str, str]], int, int]:
-    ensure_project_root_on_path()
+    ensure_project_root_on_path(repo_root)
     if repo_root is not None and str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
@@ -155,26 +149,36 @@ def collect_validation_results(
 
     resolved_config = resolve_with_root(config)
     if not resolved_config.exists():
-        results.append(_error("策略配置文件", f"未找到 {display_path(resolved_config)}"))
+        results.append(_error("策略配置文件", f"未找到 {display_path(resolved_config, repo_root=repo_root)}"))
     else:
         try:
             base_config = ConfigLoader.load_toml(str(resolved_config))
-            results.append(_ok("策略配置文件", display_path(resolved_config)))
-            artifacts.append(build_artifact(resolved_config, label="strategy-config"))
+            results.append(_ok("策略配置文件", display_path(resolved_config, repo_root=repo_root)))
+            artifacts.append(build_artifact(resolved_config, label="strategy-config", repo_root=repo_root))
         except Exception as exc:
-            results.append(_error("策略配置文件", f"{display_path(resolved_config)} 解析失败: {exc}"))
+            results.append(
+                _error(
+                    "策略配置文件",
+                    f"{display_path(resolved_config, repo_root=repo_root)} 解析失败: {exc}",
+                )
+            )
 
     if override_config is not None:
         resolved_override = resolve_with_root(override_config)
         if not resolved_override.exists():
-            results.append(_error("覆盖配置文件", f"未找到 {display_path(resolved_override)}"))
+            results.append(_error("覆盖配置文件", f"未找到 {display_path(resolved_override, repo_root=repo_root)}"))
         else:
             try:
                 override_payload = ConfigLoader.load_toml(str(resolved_override))
-                results.append(_ok("覆盖配置文件", display_path(resolved_override)))
-                artifacts.append(build_artifact(resolved_override, label="override-config"))
+                results.append(_ok("覆盖配置文件", display_path(resolved_override, repo_root=repo_root)))
+                artifacts.append(build_artifact(resolved_override, label="override-config", repo_root=repo_root))
             except Exception as exc:
-                results.append(_error("覆盖配置文件", f"{display_path(resolved_override)} 解析失败: {exc}"))
+                results.append(
+                    _error(
+                        "覆盖配置文件",
+                        f"{display_path(resolved_override, repo_root=repo_root)} 解析失败: {exc}",
+                    )
+                )
 
     if base_config is not None:
         try:
@@ -220,7 +224,7 @@ def collect_validation_results(
 
     target_path = resolve_with_root("config/general/trading_target.toml")
     if not target_path.exists():
-        results.append(_error("交易标的配置", f"未找到 {display_path(target_path)}"))
+        results.append(_error("交易标的配置", f"未找到 {display_path(target_path, repo_root=repo_root)}"))
     else:
         try:
             targets = ConfigLoader.load_target_products(str(target_path))
@@ -228,7 +232,7 @@ def collect_validation_results(
                 results.append(_error("交易标的配置", "targets 不能为空"))
             else:
                 results.append(_ok("交易标的配置", f"已配置 {len(targets)} 个标的: {', '.join(targets)}"))
-                artifacts.append(build_artifact(target_path, label="trading-target-config"))
+                artifacts.append(build_artifact(target_path, label="trading-target-config", repo_root=repo_root))
         except Exception as exc:
             results.append(_error("交易标的配置", str(exc)))
 
@@ -237,11 +241,23 @@ def collect_validation_results(
         try:
             subscription_config = ConfigLoader.load_toml(str(subscription_path))
             enabled = bool(subscription_config.get("enabled", False))
-            results.append(_ok("订阅配置", f"{display_path(subscription_path)}，enabled={enabled}"))
+            results.append(
+                _ok(
+                    "订阅配置",
+                    f"{display_path(subscription_path, repo_root=repo_root)}，enabled={enabled}",
+                )
+            )
         except Exception as exc:
-            results.append(_error("订阅配置", f"{display_path(subscription_path)} 解析失败: {exc}"))
+            results.append(
+                _error(
+                    "订阅配置",
+                    f"{display_path(subscription_path, repo_root=repo_root)} 解析失败: {exc}",
+                )
+            )
     else:
-        results.append(_warn("订阅配置", f"未找到 {display_path(subscription_path)}，按可选项跳过"))
+        results.append(
+            _warn("订阅配置", f"未找到 {display_path(subscription_path, repo_root=repo_root)}，按可选项跳过")
+        )
 
     results.extend(
         _validate_backtest_overrides(
@@ -254,14 +270,15 @@ def collect_validation_results(
             size=size,
             pricetick=pricetick,
             no_chart=no_chart,
+            repo_root=repo_root,
         )
     )
 
     error_count = sum(1 for result in results if result.status == "ERROR")
     warning_count = sum(1 for result in results if result.status == "WARN")
     summary = {
-        "config": display_path(resolved_config),
-        "override_config": display_path(override_config) if override_config else None,
+        "config": display_path(resolved_config, repo_root=repo_root),
+        "override_config": display_path(override_config, repo_root=repo_root) if override_config else None,
         "error_count": error_count,
         "warning_count": warning_count,
         "check_count": len(results),
@@ -269,21 +286,23 @@ def collect_validation_results(
     return results, summary, artifacts, error_count, warning_count
 
 
-def command(
-    config: Path = typer.Option(Path("config/strategy_config.toml"), "--config", help="策略配置文件路径。"),
-    override_config: Path | None = typer.Option(None, "--override-config", help="可选的覆盖配置文件路径。"),
-    start: str | None = typer.Option(None, "--start", help="可选的回测开始日期，格式 YYYY-MM-DD。"),
-    end: str | None = typer.Option(None, "--end", help="可选的回测结束日期，格式 YYYY-MM-DD。"),
-    capital: int | None = typer.Option(None, "--capital", help="可选的回测初始资金。"),
-    rate: float | None = typer.Option(None, "--rate", help="可选的回测手续费率。"),
-    slippage: float | None = typer.Option(None, "--slippage", help="可选的回测滑点。"),
-    size: int | None = typer.Option(None, "--size", help="可选的回测合约乘数。"),
-    pricetick: float | None = typer.Option(None, "--pricetick", help="可选的回测最小价格变动。"),
-    no_chart: str = typer.Option("", "--no-chart", flag_value="1", show_default=False, help="校验时按回测语义处理图表开关。"),
-    json_output: bool = False,
-) -> None:
+def write_latest_validation_artifact(
+    *,
+    repo_root: Path | None = None,
+    config: Path,
+    override_config: Path | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    capital: int | None = None,
+    rate: float | None = None,
+    slippage: float | None = None,
+    size: int | None = None,
+    pricetick: float | None = None,
+    no_chart: bool = False,
+) -> tuple[Path, list[CheckResult], dict[str, object], list[dict[str, str]], int, int]:
     started_at = utc_now_iso()
     results, summary, artifacts, error_count, warning_count = collect_validation_results(
+        repo_root=repo_root,
         config=config,
         override_config=override_config,
         start=start,
@@ -298,10 +317,10 @@ def command(
     finished_at = utc_now_iso()
     ok = error_count == 0
     errors = () if ok else (build_error("Validation failed", error_type="validation"),)
-    artifact_path = write_command_artifact(
-        "validate",
+    artifact_path = write_verification_artifact(
+        "validation",
         ok=ok,
-        command="validate",
+        workflow="validation",
         started_at=started_at,
         finished_at=finished_at,
         inputs={
@@ -314,33 +333,11 @@ def command(
             "slippage": slippage,
             "size": size,
             "pricetick": pricetick,
-            "no_chart": flag_enabled(no_chart),
+            "no_chart": no_chart,
         },
         summary=summary,
         artifacts=artifacts,
         errors=errors,
+        repo_root=repo_root,
     )
-    all_artifacts = [*artifacts, build_artifact(artifact_path, label="validate-latest-json")]
-
-    if json_output:
-        emit_single_json(
-            "validate",
-            ok=ok,
-            data=summary,
-            checks=results,
-            artifacts=all_artifacts,
-            errors=errors,
-            exit_code=0 if ok else EXIT_CODE_VALIDATION,
-        )
-        if not ok:
-            raise typer.Exit(code=EXIT_CODE_VALIDATION)
-        return
-
-    for result in results:
-        echo_check(result)
-
-    if not ok:
-        typer.echo(f"校验失败：{error_count} 个错误，{warning_count} 个提示。")
-        raise typer.Exit(code=EXIT_CODE_VALIDATION)
-
-    typer.echo(f"校验通过：0 个错误，{warning_count} 个提示。")
+    return artifact_path, results, summary, artifacts, error_count, warning_count
