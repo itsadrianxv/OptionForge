@@ -90,7 +90,8 @@
       "tests/strategy/application/test_execution_state_hooks.py",
       "tests/strategy/runtime/test_provider_execution_and_hedging.py",
       "tests/strategy/runtime/test_provider_observability.py",
-      "tests/web/test_monitor_logging.py"
+      "tests/web/test_monitor_logging.py",
+      "tests/strategy/application/test_lifecycle_runtime_builder.py"
     ],
     "full_selectors": [
       "tests/main/focus",
@@ -107,21 +108,15 @@
       "tests/strategy/application/test_execution_state_hooks.py",
       "tests/strategy/runtime/test_provider_execution_and_hedging.py",
       "tests/strategy/runtime/test_provider_observability.py",
-      "tests/web/test_monitor_logging.py"
+      "tests/web/test_monitor_logging.py",
+      "tests/strategy/application/test_lifecycle_runtime_builder.py"
     ],
     "smoke_keyword_expression": "not property and not pbt",
     "smoke_filter_descriptions": [
       "Exclude test nodes whose names contain `property`.",
       "Exclude test nodes whose names contain `pbt`."
     ],
-    "skipped_packs": [
-      {
-        "pack_key": "backtest",
-        "missing_modules": [
-          "chinese_calendar"
-        ]
-      }
-    ]
+    "skipped_packs": []
   },
   "generated_docs": {
     "system_map": ".focus/SYSTEM_MAP.md",

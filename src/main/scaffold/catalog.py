@@ -156,7 +156,7 @@ BASE_COPY_PATHS: tuple[str, ...] = (
     "LICENSE",
     "requirements.txt",
     "deploy",
-    "doc",
+    "docs",
     "focus",
     "src",
     "tests",

@@ -1,4 +1,4 @@
-"""策略脚手架生成器。"""
+﻿"""Strategy scaffold generator."""
 
 from __future__ import annotations
 
@@ -24,12 +24,12 @@ def _write(path: Path, content: str) -> None:
 
 
 def scaffold_strategy(name: str, destination: Path, force: bool = False) -> Path:
-    """生成一套新的策略开发模板目录。"""
+    """Generate a minimal strategy package template."""
     slug = _slugify(name)
     class_prefix = _classify(name)
     package_dir = destination / slug
     if package_dir.exists() and not force:
-        raise FileExistsError(f"目录已存在: {package_dir}")
+        raise FileExistsError(f"Directory already exists: {package_dir}")
 
     package_dir.mkdir(parents=True, exist_ok=True)
     tests_dir = package_dir / "tests"
@@ -52,8 +52,11 @@ def scaffold_strategy(name: str, destination: Path, force: bool = False) -> Path
 
 
         class {class_prefix}IndicatorService(IIndicatorService):
-            def __init__(self, **kwargs):
-                self.config = dict(kwargs)
+            """Stateless indicator service template.
+
+            Keep mutable runtime state outside the service. If the indicator needs
+            configuration, pass it through explicit context or dedicated value objects.
+            """
 
             def calculate_bar(
                 self,
@@ -70,7 +73,7 @@ def scaffold_strategy(name: str, destination: Path, force: bool = False) -> Path
                     indicator_key="template",
                     updated_indicator_keys=["template"],
                     values=dict(instrument.indicators["template"]),
-                    summary="模板指标已更新",
+                    summary="Template indicator updated.",
                 )
         ''',
     )
@@ -82,11 +85,7 @@ def scaffold_strategy(name: str, destination: Path, force: bool = False) -> Path
         from typing import Optional, TYPE_CHECKING
 
         from src.strategy.domain.domain_service.signal.signal_service import ISignalService
-        from src.strategy.domain.value_object.signal import (
-            OptionSelectionPreference,
-            SignalContext,
-            SignalDecision,
-        )
+        from src.strategy.domain.value_object.signal import SignalContext, SignalDecision
 
         if TYPE_CHECKING:
             from src.strategy.domain.entity.position import Position
@@ -94,10 +93,11 @@ def scaffold_strategy(name: str, destination: Path, force: bool = False) -> Path
 
 
         class {class_prefix}SignalService(ISignalService):
-            def __init__(self, option_type: str = "call", strike_level: int = 1, **kwargs):
-                self.option_type = option_type
-                self.strike_level = strike_level
-                self.config = dict(kwargs)
+            """Stateless signal service template.
+
+            Express policy through explicit inputs instead of keeping mutable state on
+            the service instance.
+            """
 
             def check_open_signal(
                 self,
@@ -171,6 +171,11 @@ def scaffold_strategy(name: str, destination: Path, force: bool = False) -> Path
             instrument = TargetInstrument(vt_symbol="IF2506.CFFEX")
 
             assert service.check_open_signal(instrument) is None
+
+
+        def test_scaffolded_services_start_without_instance_state() -> None:
+            assert vars({class_prefix}IndicatorService()) == {{}}
+            assert vars({class_prefix}SignalService()) == {{}}
         ''',
     )
     _write(
@@ -178,18 +183,19 @@ def scaffold_strategy(name: str, destination: Path, force: bool = False) -> Path
         f'''
         # {slug}
 
-        这是由脚手架命令生成的策略模板目录，包含：
+        This template package is generated for a new strategy implementation.
 
-        - `indicator_service.py`：指标契约实现模板
-        - `signal_service.py`：信号契约实现模板
-        - `strategy_contract.toml`：装配与可观测性模板配置
-        - `tests/test_contracts.py`：最小契约测试
+        Included files:
+        - `indicator_service.py`: stateless indicator-service template
+        - `signal_service.py`: stateless signal-service template
+        - `strategy_contract.toml`: wiring and observability defaults
+        - `tests/test_contracts.py`: minimal smoke tests for the generated contracts
 
-        典型用法：
-
-        1. 在 `indicator_service.py` 中补指标计算。
-        2. 在 `signal_service.py` 中补 `SignalDecision` 逻辑。
-        3. 将 `strategy_contract.toml` 合并进实际策略配置。
+        Recommended next steps:
+        1. Read `docs/architecture/ddd-constitution.md` and `docs/architecture/context-map.md`.
+        2. Keep domain services stateless; pass policy through explicit context or value objects.
+        3. Fill in `indicator_service.py` and `signal_service.py` with strategy-specific logic.
+        4. Merge `strategy_contract.toml` into the real strategy configuration.
         ''',
     )
 

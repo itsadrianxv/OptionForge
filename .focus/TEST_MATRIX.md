@@ -20,6 +20,7 @@
   - `tests/strategy/runtime/test_provider_execution_and_hedging.py`
   - `tests/strategy/runtime/test_provider_observability.py`
   - `tests/web/test_monitor_logging.py`
+  - `tests/strategy/application/test_lifecycle_runtime_builder.py`
 - Keyword filters:
   - Exclude test nodes whose names contain `property`.
   - Exclude test nodes whose names contain `pbt`.
@@ -43,7 +44,8 @@
   - `tests/strategy/runtime/test_provider_execution_and_hedging.py`
   - `tests/strategy/runtime/test_provider_observability.py`
   - `tests/web/test_monitor_logging.py`
+  - `tests/strategy/application/test_lifecycle_runtime_builder.py`
 
 ## Skipped Packs
 
-- `backtest`: missing dependency `chinese_calendar`
+- none
