@@ -21,6 +21,22 @@ class OrderStatus(Enum):
     REJECTED = "rejected"           # 拒单
 
 
+class OrderOwnershipScope(Enum):
+    """策略对订单的所有权范围。"""
+
+    MANAGED_ACTIONABLE = "managed_actionable"
+    OBSERVED_EXTERNAL = "observed_external"
+
+
+def classify_order_ownership_scope(direction: Direction, offset: Offset) -> OrderOwnershipScope:
+    """根据开平方向推导默认订单所有权。"""
+    if direction == Direction.SHORT and offset == Offset.OPEN:
+        return OrderOwnershipScope.MANAGED_ACTIONABLE
+    if direction == Direction.LONG and offset in (Offset.CLOSE, Offset.CLOSETODAY, Offset.CLOSEYESTERDAY):
+        return OrderOwnershipScope.MANAGED_ACTIONABLE
+    return OrderOwnershipScope.OBSERVED_EXTERNAL
+
+
 @dataclass
 class Order:
     """
@@ -52,9 +68,14 @@ class Order:
     status: OrderStatus = OrderStatus.SUBMITTING
     traded: int = 0
     signal: str = ""
+    ownership_scope: OrderOwnershipScope | None = None
     create_time: datetime = field(default_factory=datetime.now)
     update_time: Optional[datetime] = None
-    
+
+    def __post_init__(self) -> None:
+        if self.ownership_scope is None:
+            self.ownership_scope = classify_order_ownership_scope(self.direction, self.offset)
+
     def update_status(self, new_status: OrderStatus, traded: int = 0) -> None:
         """
         更新订单状态
@@ -99,6 +120,16 @@ class Order:
             OrderStatus.CANCELLED,
             OrderStatus.REJECTED
         )
+
+    @property
+    def is_strategy_actionable(self) -> bool:
+        """判断是否属于策略可直接处置的托管订单。"""
+        return self.is_active and self.ownership_scope == OrderOwnershipScope.MANAGED_ACTIONABLE
+
+    @property
+    def is_observed_external(self) -> bool:
+        """判断是否仅作为观察对象同步进系统。"""
+        return self.ownership_scope == OrderOwnershipScope.OBSERVED_EXTERNAL
     
     @property
     def is_open_order(self) -> bool:

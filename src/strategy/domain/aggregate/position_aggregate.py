@@ -24,6 +24,7 @@ from ..value_object.trading.execution_state import (
     ExecutionPriority,
     PositionExecutionState,
 )
+from ..value_object.trading.exit_intent import ExitIntent
 
 
 class PositionAggregate:
@@ -33,6 +34,7 @@ class PositionAggregate:
         self._positions: Dict[str, Position] = {}
         self._pending_orders: Dict[str, Order] = {}
         self._execution_states: Dict[str, PositionExecutionState] = {}
+        self._exit_intents: Dict[str, ExitIntent] = {}
         self._managed_symbols: Set[str] = set()
         self._domain_events: List[DomainEvent] = []
         self._daily_open_count_map: Dict[str, int] = {}
@@ -43,6 +45,10 @@ class PositionAggregate:
         return {
             "positions": self._positions,
             "pending_orders": self._pending_orders,
+            "exit_intents": {
+                subject_key: intent.to_dict()
+                for subject_key, intent in self._exit_intents.items()
+            },
             "managed_symbols": self._managed_symbols,
             "daily_open_count_map": self._daily_open_count_map,
             "global_daily_open_count": self._global_daily_open_count,
@@ -54,6 +60,14 @@ class PositionAggregate:
         obj = cls()
         obj._positions = snapshot.get("positions", {})
         obj._pending_orders = snapshot.get("pending_orders", {})
+        obj._exit_intents = {
+            str(subject_key): (
+                intent
+                if isinstance(intent, ExitIntent)
+                else ExitIntent.from_dict(dict(intent or {}))
+            )
+            for subject_key, intent in dict(snapshot.get("exit_intents", {}) or {}).items()
+        }
         obj._managed_symbols = snapshot.get("managed_symbols", set())
         obj._daily_open_count_map = snapshot.get("daily_open_count_map", {})
         obj._global_daily_open_count = snapshot.get("global_daily_open_count", 0)
@@ -131,6 +145,43 @@ class PositionAggregate:
 
     def get_all_execution_states(self) -> Dict[str, PositionExecutionState]:
         return dict(self._execution_states)
+
+    def ensure_exit_intent(
+        self,
+        *,
+        subject_key: str,
+        reason_code: str,
+        priority: int,
+        scope_key: str = "",
+        override_price: Optional[float] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        subject = str(subject_key or "")
+        if not subject:
+            raise ValueError("subject_key is required")
+
+        existing = self._exit_intents.get(subject)
+        if existing is not None and int(existing.priority) >= int(priority):
+            return False
+
+        self._exit_intents[subject] = ExitIntent(
+            subject_key=subject,
+            reason_code=str(reason_code or ""),
+            priority=int(priority),
+            scope_key=str(scope_key or ""),
+            override_price=override_price,
+            metadata=dict(metadata or {}),
+        )
+        return True
+
+    def get_exit_intent(self, subject_key: str) -> Optional[ExitIntent]:
+        return self._exit_intents.get(str(subject_key or ""))
+
+    def get_all_exit_intents(self) -> List[ExitIntent]:
+        return list(self._exit_intents.values())
+
+    def drop_exit_intent(self, subject_key: str) -> None:
+        self._exit_intents.pop(str(subject_key or ""), None)
 
     def dump_execution_states(self) -> Dict[str, PositionExecutionState]:
         return dict(self._execution_states)
@@ -469,6 +520,7 @@ class PositionAggregate:
         self._positions.clear()
         self._pending_orders.clear()
         self._execution_states.clear()
+        self._exit_intents.clear()
         self._managed_symbols.clear()
         self._domain_events.clear()
 

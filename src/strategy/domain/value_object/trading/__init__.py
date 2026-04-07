@@ -13,6 +13,7 @@ from .execution_state import (
     ExecutionPriority,
     PositionExecutionState,
 )
+from .exit_intent import ExitIntent
 from .advanced_order import (
     AdvancedOrderType, AdvancedOrderStatus,
     AdvancedOrderRequest, AdvancedOrder, ChildOrder, SliceEntry,
@@ -31,6 +32,7 @@ __all__ = [
     "ExecutionPriority",
     "PositionExecutionState",
     "CombinationExecutionState",
+    "ExitIntent",
     "AdvancedOrderType",
     "AdvancedOrderStatus",
     "AdvancedOrderRequest",
