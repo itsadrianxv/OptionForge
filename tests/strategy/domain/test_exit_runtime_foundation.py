@@ -88,3 +88,43 @@ def test_position_aggregate_snapshot_roundtrip_preserves_exit_intents() -> None:
     assert intent.priority == 70
     assert intent.scope_key == "portfolio:default"
     assert intent.metadata == {"attempt": 1}
+
+
+def test_scope_exit_preempt_summary_reports_locked_when_any_reason_is_pending() -> None:
+    aggregate = PositionAggregate()
+
+    aggregate.upsert_exit_preempt_state(
+        scope_key="underlying:IF2506.CFFEX",
+        reason_code="guarded_exit",
+        pending=True,
+        pending_reason="waiting_freshness",
+    )
+
+    summary = aggregate.get_scope_exit_preempt_summary("underlying:IF2506.CFFEX")
+    state = aggregate.get_exit_preempt_state("underlying:IF2506.CFFEX", "guarded_exit")
+
+    assert summary["locked"] is True
+    assert summary["active_reason_codes"] == ["guarded_exit"]
+    assert state.pending is True
+    assert state.pending_reason == "waiting_freshness"
+    assert state.locked is True
+
+
+def test_scope_exit_preempt_summary_roundtrip_preserves_reason_state() -> None:
+    aggregate = PositionAggregate()
+    aggregate.upsert_exit_preempt_state(
+        scope_key="portfolio:default",
+        reason_code="priority_exit",
+        condition_active=True,
+        inflight=True,
+    )
+
+    restored = PositionAggregate.from_snapshot(aggregate.to_snapshot())
+    summary = restored.get_scope_exit_preempt_summary("portfolio:default")
+    state = restored.get_exit_preempt_state("portfolio:default", "priority_exit")
+
+    assert summary["locked"] is True
+    assert summary["active_reason_codes"] == ["priority_exit"]
+    assert state.condition_active is True
+    assert state.inflight is True
+    assert state.locked is True

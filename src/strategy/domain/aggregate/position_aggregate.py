@@ -25,6 +25,7 @@ from ..value_object.trading.execution_state import (
     PositionExecutionState,
 )
 from ..value_object.trading.exit_intent import ExitIntent
+from ..value_object.trading.exit_preempt_state import ExitPreemptState
 
 
 class PositionAggregate:
@@ -35,6 +36,7 @@ class PositionAggregate:
         self._pending_orders: Dict[str, Order] = {}
         self._execution_states: Dict[str, PositionExecutionState] = {}
         self._exit_intents: Dict[str, ExitIntent] = {}
+        self._exit_preempt_states: Dict[str, Dict[str, ExitPreemptState]] = {}
         self._managed_symbols: Set[str] = set()
         self._domain_events: List[DomainEvent] = []
         self._daily_open_count_map: Dict[str, int] = {}
@@ -48,6 +50,13 @@ class PositionAggregate:
             "exit_intents": {
                 subject_key: intent.to_dict()
                 for subject_key, intent in self._exit_intents.items()
+            },
+            "exit_preempt_states": {
+                scope_key: {
+                    reason_code: state.to_dict()
+                    for reason_code, state in reason_states.items()
+                }
+                for scope_key, reason_states in self._exit_preempt_states.items()
             },
             "managed_symbols": self._managed_symbols,
             "daily_open_count_map": self._daily_open_count_map,
@@ -67,6 +76,17 @@ class PositionAggregate:
                 else ExitIntent.from_dict(dict(intent or {}))
             )
             for subject_key, intent in dict(snapshot.get("exit_intents", {}) or {}).items()
+        }
+        obj._exit_preempt_states = {
+            str(scope_key): {
+                str(reason_code): (
+                    state
+                    if isinstance(state, ExitPreemptState)
+                    else ExitPreemptState.from_dict(dict(state or {}))
+                )
+                for reason_code, state in dict(reason_states or {}).items()
+            }
+            for scope_key, reason_states in dict(snapshot.get("exit_preempt_states", {}) or {}).items()
         }
         obj._managed_symbols = snapshot.get("managed_symbols", set())
         obj._daily_open_count_map = snapshot.get("daily_open_count_map", {})
@@ -182,6 +202,67 @@ class PositionAggregate:
 
     def drop_exit_intent(self, subject_key: str) -> None:
         self._exit_intents.pop(str(subject_key or ""), None)
+
+    def upsert_exit_preempt_state(
+        self,
+        *,
+        scope_key: str,
+        reason_code: str,
+        condition_active: bool = False,
+        inflight: bool = False,
+        pending: bool = False,
+        pending_reason: str = "",
+        updated_at: Optional[datetime] = None,
+    ) -> ExitPreemptState:
+        scope = str(scope_key or "")
+        reason = str(reason_code or "")
+        if not scope:
+            raise ValueError("scope_key is required")
+        if not reason:
+            raise ValueError("reason_code is required")
+
+        state = ExitPreemptState(
+            reason_code=reason,
+            condition_active=bool(condition_active),
+            inflight=bool(inflight),
+            pending=bool(pending),
+            pending_reason=str(pending_reason or "") if pending else "",
+            updated_at=updated_at,
+        )
+        self._exit_preempt_states.setdefault(scope, {})[reason] = state
+        return state
+
+    def get_exit_preempt_state(self, scope_key: str, reason_code: str) -> ExitPreemptState:
+        scope = str(scope_key or "")
+        reason = str(reason_code or "")
+        if not scope or not reason:
+            return ExitPreemptState.empty(reason)
+        return self._exit_preempt_states.get(scope, {}).get(reason, ExitPreemptState.empty(reason))
+
+    def clear_exit_preempt_state(self, scope_key: str, reason_code: str) -> None:
+        scope = str(scope_key or "")
+        reason = str(reason_code or "")
+        reason_states = self._exit_preempt_states.get(scope)
+        if reason_states is None:
+            return
+        reason_states.pop(reason, None)
+        if not reason_states:
+            self._exit_preempt_states.pop(scope, None)
+
+    def get_scope_exit_preempt_summary(self, scope_key: str) -> Dict[str, Any]:
+        scope = str(scope_key or "")
+        reason_states = self._exit_preempt_states.get(scope, {})
+        active_reason_codes = sorted(
+            reason_code
+            for reason_code, state in reason_states.items()
+            if state.locked
+        )
+        return {
+            "scope_key": scope,
+            "locked": bool(active_reason_codes),
+            "active_reason_codes": active_reason_codes,
+            "states_by_reason": dict(reason_states),
+        }
 
     def dump_execution_states(self) -> Dict[str, PositionExecutionState]:
         return dict(self._execution_states)
@@ -521,6 +602,7 @@ class PositionAggregate:
         self._pending_orders.clear()
         self._execution_states.clear()
         self._exit_intents.clear()
+        self._exit_preempt_states.clear()
         self._managed_symbols.clear()
         self._domain_events.clear()
 
